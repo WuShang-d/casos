@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -33,6 +34,9 @@ import (
 	// apiserver in-process entry point (k3s-io/kubernetes fork)
 	apiserverapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+
+	// scheduler in-process entry point
+	schedapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 
 	globalflag "k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/logs"
@@ -418,6 +422,88 @@ func outboundIP() string {
 	}
 	defer conn.Close()
 	return conn.LocalAddr().(*net.UDPAddr).IP.String()
+}
+
+// StartScheduler launches kube-scheduler in-process. Must be called after the
+// apiserver is ready (i.e. after the readyCh from Start is closed).
+func StartScheduler(ctx context.Context, cfg Config) error {
+	certDir := filepath.Join(cfg.DataDir, "tls")
+	kubeconfigPath, err := ensureSchedulerKubeconfig(
+		certDir,
+		fmt.Sprintf("https://127.0.0.1:%d", cfg.ApiserverPort),
+	)
+	if err != nil {
+		return fmt.Errorf("scheduler kubeconfig: %w", err)
+	}
+
+	go func() {
+		cmd := schedapp.NewSchedulerCommand(ctx.Done())
+		cmd.SetArgs([]string{
+			"--kubeconfig=" + kubeconfigPath,
+			"--leader-elect=false",
+			"--bind-address=127.0.0.1",
+			"--secure-port=10259",
+		})
+		if err := cmd.ExecuteContext(ctx); err != nil && ctx.Err() == nil {
+			logrus.Errorf("scheduler exited: %v", err)
+		}
+	}()
+
+	logrus.Info("scheduler started in-process")
+	return nil
+}
+
+// ensureSchedulerKubeconfig writes a kubeconfig for the scheduler (reusing admin
+// certs) with cert data embedded as base64 to avoid Windows path issues.
+func ensureSchedulerKubeconfig(certDir, apiserverURL string) (string, error) {
+	path := filepath.Join(certDir, "scheduler.kubeconfig")
+	if fileExists(path) {
+		return path, nil
+	}
+
+	caData, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
+	if err != nil {
+		return "", err
+	}
+	certData, err := os.ReadFile(filepath.Join(certDir, "admin.crt"))
+	if err != nil {
+		return "", err
+	}
+	keyData, err := os.ReadFile(filepath.Join(certDir, "admin.key"))
+	if err != nil {
+		return "", err
+	}
+
+	kubeconfig := fmt.Sprintf(`apiVersion: v1
+kind: Config
+preferences: {}
+clusters:
+- cluster:
+    certificate-authority-data: %s
+    server: %s
+  name: casos
+contexts:
+- context:
+    cluster: casos
+    user: kube-scheduler
+  name: kube-scheduler@casos
+current-context: kube-scheduler@casos
+users:
+- name: kube-scheduler
+  user:
+    client-certificate-data: %s
+    client-key-data: %s
+`,
+		base64.StdEncoding.EncodeToString(caData),
+		apiserverURL,
+		base64.StdEncoding.EncodeToString(certData),
+		base64.StdEncoding.EncodeToString(keyData),
+	)
+
+	if err := os.WriteFile(path, []byte(kubeconfig), 0600); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // ensureServiceAccountKey generates an RSA key pair for service-account token

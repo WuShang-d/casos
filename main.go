@@ -63,13 +63,16 @@ func main() {
 		}
 	}()
 
-	// Inject admin rest config once apiserver is ready.
+	// Inject admin rest config and start scheduler once apiserver is ready.
 	go func() {
 		select {
 		case <-readyCh:
 			controllers.SetAdminRestConfig(server.AdminRestConfig(srvCfg))
 			logrus.Infof("apiserver ready — kubectl endpoint: https://127.0.0.1:%d", srvCfg.ApiserverPort)
 			logrus.Infof("UI available at http://localhost:%d", gatewayPort)
+			if err := server.StartScheduler(ctx, srvCfg); err != nil {
+				logrus.Errorf("start scheduler: %v", err)
+			}
 		case <-ctx.Done():
 		}
 	}()
