@@ -7,6 +7,7 @@ import {Content, Header} from "antd/es/layout/layout";
 import * as Setting from "./Setting";
 import PodListPage from "./PodListPage";
 import ConfigMapListPage from "./ConfigMapListPage";
+import NamespaceListPage from "./NamespaceListPage";
 
 const {Text} = Typography;
 
@@ -21,6 +22,14 @@ function getMenuItems() {
       ]
     ),
     Setting.getItem(
+      <Link to="/namespaces">Cluster</Link>,
+      "/cluster",
+      <AppstoreOutlined />,
+      [
+        Setting.getItem(<Link to="/namespaces">Namespaces</Link>, "/namespaces"),
+      ]
+    ),
+    Setting.getItem(
       <Link to="/configmaps">Configuration</Link>,
       "/configuration",
       <AppstoreOutlined />,
@@ -30,6 +39,12 @@ function getMenuItems() {
     ),
   ];
 }
+
+const pathToGroup = {
+  "/pods": "/workloads",
+  "/namespaces": "/cluster",
+  "/configmaps": "/configuration",
+};
 
 function ManagementPage(props) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("siderCollapsed") === "true");
@@ -42,7 +57,7 @@ function ManagementPage(props) {
 
   const uri = props.location?.pathname ?? "/";
   const selectedKey = "/" + (uri.split("/").filter(Boolean)[0] || "pods");
-  const openKeys = selectedKey === "/configmaps" ? ["/configuration"] : ["/workloads"];
+  const openKey = pathToGroup[selectedKey] ?? "/workloads";
 
   return (
     <Layout style={{minHeight: "100vh"}}>
@@ -70,7 +85,7 @@ function ManagementPage(props) {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={openKeys}
+          defaultOpenKeys={[openKey]}
           items={getMenuItems()}
         />
       </Sider>
@@ -100,6 +115,7 @@ function ManagementPage(props) {
           <Switch>
             <Redirect exact from="/" to="/pods" />
             <Route exact path="/pods" render={(props) => <PodListPage {...props} />} />
+            <Route exact path="/namespaces" render={(props) => <NamespaceListPage {...props} />} />
             <Route exact path="/configmaps" render={(props) => <ConfigMapListPage {...props} />} />
           </Switch>
         </Content>
