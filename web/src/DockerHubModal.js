@@ -3,11 +3,39 @@ import {Alert, Card, Input, Modal, Space, Spin, Tooltip} from "antd";
 import {AppstoreOutlined, CheckCircleFilled, SearchOutlined, StarFilled} from "@ant-design/icons";
 import * as PodBackend from "./backend/PodBackend";
 
+
 function formatPullCount(n) {
   if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
   return String(n);
+}
+
+function ImageLogo({name, logoUrl}) {
+  const [failed, setFailed] = React.useState(false);
+  const url = failed ? null : logoUrl;
+
+  if (!url || failed) {
+    return (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink: 0}}>
+        <rect width="28" height="28" rx="6" fill="#E8F4FD" />
+        <text x="14" y="19" textAnchor="middle" fontSize="13" fill="#1677ff" fontFamily="monospace" fontWeight="bold">
+          {name ? name[0].toUpperCase() : "?"}
+        </text>
+      </svg>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt={name}
+      width={28}
+      height={28}
+      style={{borderRadius: 6, objectFit: "contain", flexShrink: 0, background: "#f5f5f5"}}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 class DockerHubModal extends React.Component {
@@ -111,6 +139,7 @@ class DockerHubModal extends React.Component {
               >
                 <div style={{display: "flex", flexDirection: "column", gap: 4}}>
                   <div style={{display: "flex", alignItems: "center", gap: 6}}>
+                    <ImageLogo name={img.name} logoUrl={img.logoUrl} />
                     <span style={{fontWeight: 600, fontSize: 13, color: "#262626", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
                       {img.name}
                     </span>

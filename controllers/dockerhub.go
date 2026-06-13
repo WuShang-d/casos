@@ -29,6 +29,7 @@ type ImageSearchItem struct {
 	IsOfficial  bool   `json:"isOfficial"`
 	PullCount   int64  `json:"pullCount"`
 	StarCount   int    `json:"starCount"`
+	LogoURL     string `json:"logoUrl"`
 }
 
 func (c *ApiController) SearchDockerHubImages() {
@@ -62,15 +63,22 @@ func (c *ApiController) SearchDockerHubImages() {
 		return
 	}
 
-	items := make([]ImageSearchItem, 0, len(result.Results))
-	for _, r := range result.Results {
-		items = append(items, ImageSearchItem{
+	names := make([]string, len(result.Results))
+	for i, r := range result.Results {
+		names[i] = r.Name
+	}
+	nsLogos := FetchNamespaceLogos(uniqueNamespaces(names))
+
+	items := make([]ImageSearchItem, len(result.Results))
+	for i, r := range result.Results {
+		items[i] = ImageSearchItem{
 			Name:        r.Name,
 			Description: r.Description,
 			IsOfficial:  r.IsOfficial,
 			PullCount:   r.PullCount,
 			StarCount:   r.StarCount,
-		})
+			LogoURL:     nsLogos[extractNamespace(r.Name)],
+		}
 	}
 
 	c.ResponseOk(items)

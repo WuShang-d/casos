@@ -169,7 +169,7 @@ class PodListPage extends React.Component {
           labels,
         }).then(res => {
           if (res.status === "ok") {
-            Setting.showMessage("success", "Pod created (will be Pending without a worker node)");
+            Setting.showMessage("success", "Pod created");
             this.closeModal();
             this.fetchPods();
           } else {
