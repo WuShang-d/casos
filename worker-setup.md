@@ -25,7 +25,7 @@ sudo apt update
 ## 2. Install containerd
 
 ```bash
-sudo apt install -y containerd
+sudo apt install -y containerd iptables
 ```
 
 Configure containerd to use the systemd cgroup driver:

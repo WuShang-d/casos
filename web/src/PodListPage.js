@@ -1,8 +1,8 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography,
+  Alert, Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography,
 } from "antd";
-import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
+import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, UnorderedListOutlined} from "@ant-design/icons";
 import * as PodBackend from "./backend/PodBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
@@ -29,6 +29,11 @@ class PodListPage extends React.Component {
       modalMode: "add",
       submitting: false,
       editingPod: null,
+      eventsDrawerVisible: false,
+      eventsPod: null,
+      events: [],
+      eventsLoading: false,
+      eventsError: null,
     };
     this.formRef = React.createRef();
   }
@@ -36,6 +41,48 @@ class PodListPage extends React.Component {
   componentDidMount() {
     this.fetchPods();
     this.fetchNamespaces();
+  }
+
+  componentWillUnmount() {
+    this.stopEventsPolling();
+  }
+
+  openEventsDrawer(pod) {
+    this.setState({eventsDrawerVisible: true, eventsPod: pod, events: [], eventsError: null}, () => {
+      this.fetchEvents();
+      this._eventsTimer = setInterval(() => this.fetchEvents(), 3000);
+    });
+  }
+
+  closeEventsDrawer() {
+    this.stopEventsPolling();
+    this.setState({eventsDrawerVisible: false, eventsPod: null, events: []});
+  }
+
+  stopEventsPolling() {
+    if (this._eventsTimer) {
+      clearInterval(this._eventsTimer);
+      this._eventsTimer = null;
+    }
+  }
+
+  fetchEvents() {
+    const {eventsPod} = this.state;
+    if (!eventsPod) {
+      return;
+    }
+    this.setState({eventsLoading: true});
+    PodBackend.getPodEvents(eventsPod.namespace, eventsPod.name).then(res => {
+      if (res.status === "ok") {
+        this.setState({events: res.data ?? [], eventsError: null});
+      } else {
+        this.setState({eventsError: res.msg});
+      }
+    }).catch(e => {
+      this.setState({eventsError: e.message});
+    }).finally(() => {
+      this.setState({eventsLoading: false});
+    });
   }
 
   fetchNamespaces() {
@@ -154,7 +201,8 @@ class PodListPage extends React.Component {
   }
 
   render() {
-    const {pods, namespaces, loading, error, modalVisible, modalMode, submitting} = this.state;
+    const {pods, namespaces, loading, error, modalVisible, modalMode, submitting,
+      eventsDrawerVisible, eventsPod, events, eventsLoading, eventsError} = this.state;
 
     const nsOptions = namespaces.map(ns => ({label: ns.name, value: ns.name}));
 
@@ -185,6 +233,13 @@ class PodListPage extends React.Component {
         width: 140,
         render: (_, record) => (
           <Space>
+            <Button
+              size="small"
+              icon={<UnorderedListOutlined />}
+              onClick={() => this.openEventsDrawer(record)}
+            >
+              Events
+            </Button>
             <Button
               size="small"
               icon={<EditOutlined />}
@@ -337,6 +392,54 @@ class PodListPage extends React.Component {
             </Form.List>
           </Form>
         </Modal>
+
+        <Drawer
+          title={eventsPod ? `Events — ${eventsPod.namespace}/${eventsPod.name}` : "Events"}
+          open={eventsDrawerVisible}
+          onClose={() => this.closeEventsDrawer()}
+          width={720}
+          extra={
+            <Tag color={eventsLoading ? "processing" : "success"}>
+              {eventsLoading ? "refreshing…" : "live · 3s"}
+            </Tag>
+          }
+        >
+          {eventsError && (
+            <Alert type="error" message={eventsError} style={{marginBottom: 12}} showIcon />
+          )}
+          <div style={{
+            background: "#0d1117",
+            borderRadius: 6,
+            padding: "12px 16px",
+            fontFamily: "'Cascadia Code', 'Fira Mono', 'Consolas', monospace",
+            fontSize: 13,
+            lineHeight: 1.7,
+            minHeight: 200,
+            maxHeight: "calc(100vh - 160px)",
+            overflowY: "auto",
+            color: "#c9d1d9",
+          }}>
+            {events.length === 0 && !eventsLoading && (
+              <span style={{color: "#6e7681"}}>No events yet…</span>
+            )}
+            {events.map((e, i) => {
+              const typeColor = e.type === "Warning" ? "#f85149" : "#3fb950";
+              const reasonColor = "#79c0ff";
+              return (
+                <div key={i} style={{marginBottom: 6}}>
+                  <span style={{color: "#6e7681"}}>{e.lastTimestamp}</span>
+                  {" "}
+                  <span style={{color: typeColor, fontWeight: 600}}>{e.type}</span>
+                  {" "}
+                  <span style={{color: reasonColor}}>{e.reason}</span>
+                  {e.count > 1 && <span style={{color: "#6e7681"}}> (×{e.count})</span>}
+                  {" — "}
+                  <span>{e.message}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Drawer>
       </div>
     );
   }

@@ -2,6 +2,7 @@ package object
 
 import (
 	"context"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,4 +56,22 @@ func DeletePod(cfg *rest.Config, namespace, name string) error {
 		return err
 	}
 	return client.CoreV1().Pods(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+}
+
+func GetPodEvents(cfg *rest.Config, namespace, name string) ([]corev1.Event, error) {
+	client, err := newClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	list, err := client.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{
+		FieldSelector: "involvedObject.name=" + name + ",involvedObject.namespace=" + namespace,
+	})
+	if err != nil {
+		return nil, err
+	}
+	events := list.Items
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].LastTimestamp.Before(&events[j].LastTimestamp)
+	})
+	return events, nil
 }

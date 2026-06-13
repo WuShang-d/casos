@@ -184,6 +184,47 @@ func (c *ApiController) UpdatePod() {
 	c.ResponseOk(toPodSummary(*updated))
 }
 
+type eventSummary struct {
+	Type           string `json:"type"`
+	Reason         string `json:"reason"`
+	Message        string `json:"message"`
+	Count          int32  `json:"count"`
+	LastTimestamp  string `json:"lastTimestamp"`
+	FirstTimestamp string `json:"firstTimestamp"`
+}
+
+// GetPodEvents returns Kubernetes events for a specific pod.
+// @router /api/get-pod-events [get]
+func (c *ApiController) GetPodEvents() {
+	cfg := getAdminRestConfig()
+	if cfg == nil {
+		c.ResponseError("apiserver not ready")
+		return
+	}
+	namespace := c.GetString("namespace")
+	name := c.GetString("name")
+	if namespace == "" {
+		namespace = "default"
+	}
+	events, err := object.GetPodEvents(cfg, namespace, name)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	result := make([]eventSummary, 0, len(events))
+	for _, e := range events {
+		result = append(result, eventSummary{
+			Type:           e.Type,
+			Reason:         e.Reason,
+			Message:        e.Message,
+			Count:          e.Count,
+			LastTimestamp:  e.LastTimestamp.UTC().Format("2006-01-02 15:04:05"),
+			FirstTimestamp: e.FirstTimestamp.UTC().Format("2006-01-02 15:04:05"),
+		})
+	}
+	c.ResponseOk(result)
+}
+
 // DeletePod
 // @router /api/delete-pod [post]
 func (c *ApiController) DeletePod() {

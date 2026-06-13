@@ -32,6 +32,14 @@ export function updatePod(pod) {
   }).then(res => res.json());
 }
 
+export function getPodEvents(namespace, name) {
+  return fetch(`${Setting.ServerUrl}/api/get-pod-events?namespace=${encodeURIComponent(namespace)}&name=${encodeURIComponent(name)}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {"Accept-Language": Setting.getAcceptLanguage()},
+  }).then(res => res.json());
+}
+
 export function deletePod(namespace, name) {
   return fetch(`${Setting.ServerUrl}/api/delete-pod`, {
     method: "POST",
