@@ -87,8 +87,9 @@ func Start(ctx context.Context, cfg Config) (<-chan struct{}, error) {
 	// Step 1: start kine (MySQL backend exposed as etcd v3 gRPC on loopback).
 	// endpoint.Listen returns (ETCDConfig, error) directly — not a struct field.
 	etcdCfg, err := endpoint.Listen(ctx, endpoint.Config{
-		Endpoint: "mysql://" + cfg.DSN,
-		Listener: "tcp://127.0.0.1:2379",
+		Endpoint:         "mysql://" + cfg.DSN,
+		Listener:         "tcp://127.0.0.1:2379",
+		CompactBatchSize: 100,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("kine listen: %w", err)
