@@ -6,6 +6,7 @@ import Sider from "antd/es/layout/Sider";
 import {Content, Header} from "antd/es/layout/layout";
 import * as Setting from "./Setting";
 import PodListPage from "./PodListPage";
+import ConfigMapListPage from "./ConfigMapListPage";
 
 const {Text} = Typography;
 
@@ -17,6 +18,14 @@ function getMenuItems() {
       <AppstoreOutlined />,
       [
         Setting.getItem(<Link to="/pods">Pods</Link>, "/pods"),
+      ]
+    ),
+    Setting.getItem(
+      <Link to="/configmaps">Configuration</Link>,
+      "/configuration",
+      <AppstoreOutlined />,
+      [
+        Setting.getItem(<Link to="/configmaps">ConfigMaps</Link>, "/configmaps"),
       ]
     ),
   ];
@@ -33,6 +42,7 @@ function ManagementPage(props) {
 
   const uri = props.location?.pathname ?? "/";
   const selectedKey = "/" + (uri.split("/").filter(Boolean)[0] || "pods");
+  const openKeys = selectedKey === "/configmaps" ? ["/configuration"] : ["/workloads"];
 
   return (
     <Layout style={{minHeight: "100vh"}}>
@@ -60,7 +70,7 @@ function ManagementPage(props) {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={["/workloads"]}
+          defaultOpenKeys={openKeys}
           items={getMenuItems()}
         />
       </Sider>
@@ -90,6 +100,7 @@ function ManagementPage(props) {
           <Switch>
             <Redirect exact from="/" to="/pods" />
             <Route exact path="/pods" render={(props) => <PodListPage {...props} />} />
+            <Route exact path="/configmaps" render={(props) => <ConfigMapListPage {...props} />} />
           </Switch>
         </Content>
       </Layout>
