@@ -40,6 +40,7 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("control plane start: %v", err)
 	}
+	controllers.SetServerConfig(&srvCfg)
 
 	// Register beego routes.
 	routers.InitAPI()

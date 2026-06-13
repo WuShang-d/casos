@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/casosorg/casos/object"
+	"github.com/casosorg/casos/server"
 )
 
 // adminCfg is atomically set once the apiserver is ready.
@@ -22,6 +23,18 @@ func SetAdminRestConfig(cfg *rest.Config) {
 
 func getAdminRestConfig() *rest.Config {
 	return (*rest.Config)(atomic.LoadPointer(&adminCfg))
+}
+
+// srvCfg is atomically set at startup so controllers can access cert paths.
+var srvCfg unsafe.Pointer // *server.Config
+
+// SetServerConfig stores the server.Config for use by node cert generation.
+func SetServerConfig(cfg *server.Config) {
+	atomic.StorePointer(&srvCfg, unsafe.Pointer(cfg))
+}
+
+func getServerConfig() *server.Config {
+	return (*server.Config)(atomic.LoadPointer(&srvCfg))
 }
 
 type podSummary struct {
