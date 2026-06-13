@@ -62,10 +62,11 @@ func main() {
 		}
 	}()
 
-	// Log readiness once apiserver signals it.
+	// Inject admin rest config once apiserver is ready.
 	go func() {
 		select {
 		case <-readyCh:
+			controllers.SetAdminRestConfig(server.AdminRestConfig(srvCfg))
 			logrus.Infof("apiserver ready — kubectl endpoint: https://127.0.0.1:%d", srvCfg.ApiserverPort)
 			logrus.Infof("UI available at http://localhost:%d", gatewayPort)
 		case <-ctx.Done():

@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"sync/atomic"
+	"unsafe"
+
 	"github.com/beego/beego/v2/server/web"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -8,12 +11,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// adminToken is injected at startup after the apiserver bootstrap completes.
-// TODO: read from DataDir service-account token in milestone 2.
-var adminToken = ""
+// adminCfg is atomically set once the apiserver is ready.
+var adminCfg unsafe.Pointer // *rest.Config
 
-// SetAdminToken lets main.go inject the bearer token after apiserver is ready.
-func SetAdminToken(token string) { adminToken = token }
+// SetAdminRestConfig injects the admin rest config after apiserver bootstrap.
+func SetAdminRestConfig(cfg *rest.Config) {
+	atomic.StorePointer(&adminCfg, unsafe.Pointer(cfg))
+}
+
+func getAdminRestConfig() *rest.Config {
+	return (*rest.Config)(atomic.LoadPointer(&adminCfg))
+}
 
 // PodController serves GET /api/pods.
 type PodController struct {
@@ -28,13 +36,14 @@ type podSummary struct {
 }
 
 func (c *PodController) GetAll() {
-	cfg := &rest.Config{
-		Host: "https://127.0.0.1:6443",
-		// Milestone 1: skip TLS verification against the self-signed cert.
-		// Milestone 2: set CAFile to the generated ca.crt instead.
-		TLSClientConfig: rest.TLSClientConfig{Insecure: true},
-		BearerToken:     adminToken,
+	cfg := getAdminRestConfig()
+	if cfg == nil {
+		c.Ctx.Output.SetStatus(503)
+		c.Data["json"] = map[string]string{"error": "apiserver not ready"}
+		c.ServeJSON()
+		return
 	}
+
 	client, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		logrus.Errorf("pod controller: build k8s client: %v", err)

@@ -24,8 +24,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
+	"database/sql"
+
 	// kine: MySQL -> etcd v3 gRPC adapter
 	"github.com/k3s-io/kine/pkg/endpoint"
+	_ "github.com/go-sql-driver/mysql"
 
 	// apiserver in-process entry point (k3s-io/kubernetes fork)
 	apiserverapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -33,14 +36,16 @@ import (
 
 	globalflag "k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/logs"
+	"k8s.io/client-go/rest"
 )
 
 // Config holds control-plane settings populated from app.conf.
 type Config struct {
-	DataDir       string
-	ApiserverBind string
-	ApiserverPort int
-	DSN           string // MySQL DSN forwarded to kine
+	DataDir          string
+	ApiserverBind    string // actual bind / SAN IP (may be loopback in dev)
+	AdvertiseAddress string // non-loopback IP registered as kubernetes service endpoint
+	ApiserverPort    int
+	DSN              string // MySQL DSN forwarded to kine
 }
 
 // ConfigFromAppConf reads server config from the beego app.conf.
@@ -51,7 +56,7 @@ func ConfigFromAppConf() (Config, error) {
 	}
 	bind, _ := config.String("apiserverBind")
 	if bind == "" {
-		bind = "127.0.0.1"
+		bind = outboundIP()
 	}
 	port, _ := config.Int("apiserverPort")
 	if port == 0 {
@@ -67,11 +72,17 @@ func ConfigFromAppConf() (Config, error) {
 	}
 	dsn = injectDBName(dsn, dbName)
 
+	advertise := outboundIP()
+	if advertise == "127.0.0.1" || advertise == "::1" {
+		advertise = bind
+	}
+
 	return Config{
-		DataDir:       dataDir,
-		ApiserverBind: bind,
-		ApiserverPort: port,
-		DSN:           dsn,
+		DataDir:          dataDir,
+		ApiserverBind:    bind,
+		AdvertiseAddress: advertise,
+		ApiserverPort:    port,
+		DSN:              dsn,
 	}, nil
 }
 
@@ -82,7 +93,7 @@ func Start(ctx context.Context, cfg Config) (<-chan struct{}, error) {
 	if err := os.MkdirAll(certDir, 0700); err != nil {
 		return nil, fmt.Errorf("mkdir tls: %w", err)
 	}
-	if err := ensureCerts(certDir, cfg.ApiserverBind); err != nil {
+	if err := ensureCerts(certDir, cfg.ApiserverBind, cfg.AdvertiseAddress); err != nil {
 		return nil, fmt.Errorf("certs: %w", err)
 	}
 	if err := ensureServiceAccountKey(certDir); err != nil {
@@ -104,6 +115,12 @@ func Start(ctx context.Context, cfg Config) (<-chan struct{}, error) {
 		return nil, fmt.Errorf("kine listen: %w", err)
 	}
 	logrus.Infof("kine started, etcd endpoint: %v", etcdCfg.Endpoints)
+
+	// Delete stale kubernetes service endpoints from a previous run so the
+	// bootstrap controller can recreate them with the current advertise address.
+	if err := deleteStaleKubernetesEndpoints(cfg.DSN); err != nil {
+		logrus.Warnf("failed to delete stale kubernetes endpoints: %v", err)
+	}
 
 	// Step 2: build apiserver options and parse flags.
 	// Mirrors what NewAPIServerCommand does: merge NamedFlagSets into one pflag.FlagSet.
@@ -196,7 +213,7 @@ func buildApiserverArgs(cfg Config, certDir, etcdEndpoint string) []string {
 	saKey := filepath.Join(certDir, "sa.key")
 	saPub := filepath.Join(certDir, "sa.pub")
 	return []string{
-		"--advertise-address=" + cfg.ApiserverBind,
+		"--advertise-address=" + cfg.AdvertiseAddress,
 		"--bind-address=0.0.0.0",
 		fmt.Sprintf("--secure-port=%d", cfg.ApiserverPort),
 		"--etcd-servers=" + etcdEndpoint,
@@ -214,67 +231,139 @@ func buildApiserverArgs(cfg Config, certDir, etcdEndpoint string) []string {
 	}
 }
 
-// ensureCerts generates a self-signed CA and apiserver cert/key if absent.
-// Replace with a proper PKI in production.
-func ensureCerts(dir, ip string) error {
+// ensureCerts generates a self-signed CA, apiserver cert/key, and admin client
+// cert/key if absent.
+func ensureCerts(dir, ip, advertiseIP string) error {
 	caKeyFile  := filepath.Join(dir, "ca.key")
 	caCertFile := filepath.Join(dir, "ca.crt")
 	srvKeyFile := filepath.Join(dir, "apiserver.key")
 	srvCrtFile := filepath.Join(dir, "apiserver.crt")
+	admKeyFile := filepath.Join(dir, "admin.key")
+	admCrtFile := filepath.Join(dir, "admin.crt")
 
-	if fileExists(caCertFile) && fileExists(srvCrtFile) {
-		return nil
+	// Load or generate the CA.
+	var caKey *ecdsa.PrivateKey
+	var caCert *x509.Certificate
+	if fileExists(caCertFile) && fileExists(caKeyFile) {
+		// Load existing CA.
+		keyPEM, err := os.ReadFile(caKeyFile)
+		if err != nil {
+			return err
+		}
+		block, _ := pem.Decode(keyPEM)
+		caKey, err = x509.ParseECPrivateKey(block.Bytes)
+		if err != nil {
+			return err
+		}
+		certPEM, err := os.ReadFile(caCertFile)
+		if err != nil {
+			return err
+		}
+		block, _ = pem.Decode(certPEM)
+		caCert, err = x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		caKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return err
+		}
+		caTemplate := &x509.Certificate{
+			SerialNumber:          big.NewInt(1),
+			Subject:               pkix.Name{CommonName: "casos-ca"},
+			NotBefore:             time.Now().Add(-time.Minute),
+			NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
+			IsCA:                  true,
+			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+			BasicConstraintsValid: true,
+		}
+		caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+		if err != nil {
+			return err
+		}
+		if err := writePEM(caCertFile, "CERTIFICATE", caDER); err != nil {
+			return err
+		}
+		caKeyDER, _ := x509.MarshalECPrivateKey(caKey)
+		if err := writePEM(caKeyFile, "EC PRIVATE KEY", caKeyDER); err != nil {
+			return err
+		}
+		caCert, _ = x509.ParseCertificate(caDER)
 	}
 
-	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return err
+	// Generate apiserver serving cert if absent.
+	if !fileExists(srvCrtFile) {
+		srvKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return err
+		}
+		srvTemplate := &x509.Certificate{
+			SerialNumber: big.NewInt(2),
+			Subject:      pkix.Name{CommonName: "kube-apiserver"},
+			NotBefore:    time.Now().Add(-time.Minute),
+			NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
+			KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			IPAddresses:  uniqueIPs("127.0.0.1", ip, advertiseIP),
+			DNSNames:     []string{"localhost", "kubernetes", "kubernetes.default", "kubernetes.default.svc"},
+		}
+		srvDER, err := x509.CreateCertificate(rand.Reader, srvTemplate, caCert, &srvKey.PublicKey, caKey)
+		if err != nil {
+			return err
+		}
+		if err := writePEM(srvCrtFile, "CERTIFICATE", srvDER); err != nil {
+			return err
+		}
+		srvKeyDER, _ := x509.MarshalECPrivateKey(srvKey)
+		if err := writePEM(srvKeyFile, "EC PRIVATE KEY", srvKeyDER); err != nil {
+			return err
+		}
 	}
-	caTemplate := &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: "casos-ca"},
-		NotBefore:             time.Now().Add(-time.Minute),
-		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
-		IsCA:                  true,
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-	}
-	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
-	if err != nil {
-		return err
-	}
-	if err := writePEM(caCertFile, "CERTIFICATE", caDER); err != nil {
-		return err
-	}
-	caKeyDER, _ := x509.MarshalECPrivateKey(caKey)
-	if err := writePEM(caKeyFile, "EC PRIVATE KEY", caKeyDER); err != nil {
-		return err
-	}
-	caCert, _ := x509.ParseCertificate(caDER)
 
-	srvKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return err
+	// Generate admin client cert if absent (CN=admin, O=system:masters grants full access).
+	if !fileExists(admCrtFile) {
+		admKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return err
+		}
+		admTemplate := &x509.Certificate{
+			SerialNumber: big.NewInt(3),
+			Subject:      pkix.Name{CommonName: "admin", Organization: []string{"system:masters"}},
+			NotBefore:    time.Now().Add(-time.Minute),
+			NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
+			KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		admDER, err := x509.CreateCertificate(rand.Reader, admTemplate, caCert, &admKey.PublicKey, caKey)
+		if err != nil {
+			return err
+		}
+		if err := writePEM(admCrtFile, "CERTIFICATE", admDER); err != nil {
+			return err
+		}
+		admKeyDER, _ := x509.MarshalECPrivateKey(admKey)
+		if err := writePEM(admKeyFile, "EC PRIVATE KEY", admKeyDER); err != nil {
+			return err
+		}
 	}
-	srvTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(2),
-		Subject:      pkix.Name{CommonName: "kube-apiserver"},
-		NotBefore:    time.Now().Add(-time.Minute),
-		NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP(ip)},
-		DNSNames:     []string{"localhost", "kubernetes", "kubernetes.default", "kubernetes.default.svc"},
+
+	return nil
+}
+
+// AdminRestConfig returns a rest.Config that authenticates to the apiserver
+// using the generated admin client certificate (system:masters group).
+func AdminRestConfig(cfg Config) *rest.Config {
+	certDir := filepath.Join(cfg.DataDir, "tls")
+	return &rest.Config{
+		Host: fmt.Sprintf("https://127.0.0.1:%d", cfg.ApiserverPort),
+		TLSClientConfig: rest.TLSClientConfig{
+			CAFile:   filepath.Join(certDir, "ca.crt"),
+			CertFile: filepath.Join(certDir, "admin.crt"),
+			KeyFile:  filepath.Join(certDir, "admin.key"),
+		},
 	}
-	srvDER, err := x509.CreateCertificate(rand.Reader, srvTemplate, caCert, &srvKey.PublicKey, caKey)
-	if err != nil {
-		return err
-	}
-	if err := writePEM(srvCrtFile, "CERTIFICATE", srvDER); err != nil {
-		return err
-	}
-	srvKeyDER, _ := x509.MarshalECPrivateKey(srvKey)
-	return writePEM(srvKeyFile, "EC PRIVATE KEY", srvKeyDER)
 }
 
 func writePEM(path, typ string, der []byte) error {
@@ -289,6 +378,46 @@ func writePEM(path, typ string, der []byte) error {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// deleteStaleKubernetesEndpoints removes the default/kubernetes Endpoints object
+// from kine's MySQL table so the bootstrap controller starts fresh on each run.
+func deleteStaleKubernetesEndpoints(dsn string) error {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	const q = `UPDATE kine SET deleted=1 WHERE name='/registry/endpoints/default/kubernetes' AND deleted=0`
+	_, err = db.Exec(q)
+	return err
+}
+
+// uniqueIPs returns a deduplicated list of net.IP from the given string IPs.
+func uniqueIPs(addrs ...string) []net.IP {
+	seen := map[string]bool{}
+	var result []net.IP
+	for _, a := range addrs {
+		ip := net.ParseIP(a)
+		if ip == nil || seen[ip.String()] {
+			continue
+		}
+		seen[ip.String()] = true
+		result = append(result, ip)
+	}
+	return result
+}
+
+// outboundIP returns the preferred non-loopback outbound IP of this machine.
+func outboundIP() string {
+	// Dial a public address (no data is actually sent) to learn which local IP
+	// the OS would select for outbound traffic.
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "127.0.0.1"
+	}
+	defer conn.Close()
+	return conn.LocalAddr().(*net.UDPAddr).IP.String()
 }
 
 // ensureServiceAccountKey generates an RSA key pair for service-account token
