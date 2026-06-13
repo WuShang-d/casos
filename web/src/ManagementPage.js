@@ -10,6 +10,7 @@ import ConfigMapListPage from "./ConfigMapListPage";
 import NamespaceListPage from "./NamespaceListPage";
 import NodeListPage from "./NodeListPage";
 import ServiceAccountListPage from "./ServiceAccountListPage";
+import ServiceListPage from "./ServiceListPage";
 
 const {Text} = Typography;
 
@@ -41,6 +42,14 @@ function getMenuItems() {
         Setting.getItem(<Link to="/configmaps">ConfigMaps</Link>, "/configmaps"),
       ]
     ),
+    Setting.getItem(
+      <Link to="/services">Networking</Link>,
+      "/networking",
+      <AppstoreOutlined />,
+      [
+        Setting.getItem(<Link to="/services">Services</Link>, "/services"),
+      ]
+    ),
   ];
 }
 
@@ -50,6 +59,7 @@ const pathToGroup = {
   "/namespaces": "/cluster",
   "/serviceaccounts": "/cluster",
   "/configmaps": "/configuration",
+  "/services": "/networking",
 };
 
 function ManagementPage(props) {
@@ -125,6 +135,7 @@ function ManagementPage(props) {
             <Route exact path="/namespaces" render={(props) => <NamespaceListPage {...props} />} />
             <Route exact path="/serviceaccounts" render={(props) => <ServiceAccountListPage {...props} />} />
             <Route exact path="/configmaps" render={(props) => <ConfigMapListPage {...props} />} />
+            <Route exact path="/services" render={(props) => <ServiceListPage {...props} />} />
           </Switch>
         </Content>
       </Layout>

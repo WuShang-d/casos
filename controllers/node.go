@@ -17,6 +17,8 @@ type nodeSummary struct {
 	KubeletVersion  string            `json:"kubeletVersion"`
 	OS              string            `json:"os"`
 	Arch            string            `json:"arch"`
+	InternalIP      string            `json:"internalIP"`
+	ExternalIP      string            `json:"externalIP"`
 	CreatedAt       string            `json:"createdAt"`
 	ResourceVersion string            `json:"resourceVersion"`
 }
@@ -43,6 +45,16 @@ func toNodeSummary(n corev1.Node) nodeSummary {
 	if len(roles) == 0 {
 		roles = append(roles, "worker")
 	}
+	var internalIP, externalIP string
+	for _, addr := range n.Status.Addresses {
+		switch addr.Type {
+		case corev1.NodeInternalIP:
+			internalIP = addr.Address
+		case corev1.NodeExternalIP:
+			externalIP = addr.Address
+		}
+	}
+
 	return nodeSummary{
 		Name:            n.Name,
 		Status:          status,
@@ -52,6 +64,8 @@ func toNodeSummary(n corev1.Node) nodeSummary {
 		KubeletVersion:  n.Status.NodeInfo.KubeletVersion,
 		OS:              n.Status.NodeInfo.OperatingSystem,
 		Arch:            n.Status.NodeInfo.Architecture,
+		InternalIP:      internalIP,
+		ExternalIP:      externalIP,
 		CreatedAt:       n.CreationTimestamp.UTC().Format("2006-01-02 15:04:05"),
 		ResourceVersion: n.ResourceVersion,
 	}
