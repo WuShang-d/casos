@@ -32,6 +32,8 @@ func InitAPI() {
 	beego.Router("/api/update-serviceaccount", &controllers.ApiController{}, "POST:UpdateServiceAccount")
 	beego.Router("/api/delete-serviceaccount", &controllers.ApiController{}, "POST:DeleteServiceAccount")
 
+	beego.Router("/api/search-docker-hub-images", &controllers.ApiController{}, "GET:SearchDockerHubImages")
+
 	beego.Router("/api/get-configmaps", &controllers.ApiController{}, "GET:GetConfigMaps")
 	beego.Router("/api/get-configmap", &controllers.ApiController{}, "GET:GetConfigMap")
 	beego.Router("/api/add-configmap", &controllers.ApiController{}, "POST:AddConfigMap")

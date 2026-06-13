@@ -1,11 +1,12 @@
 import React from "react";
 import {
-  Alert, Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography,
+  Alert, Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography,
 } from "antd";
-import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, UnorderedListOutlined} from "@ant-design/icons";
+import {AppstoreOutlined, DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, UnorderedListOutlined} from "@ant-design/icons";
 import * as PodBackend from "./backend/PodBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
+import DockerHubModal from "./DockerHubModal";
 
 const {Title} = Typography;
 
@@ -34,6 +35,7 @@ class PodListPage extends React.Component {
       events: [],
       eventsLoading: false,
       eventsError: null,
+      marketplaceVisible: false,
     };
     this.formRef = React.createRef();
   }
@@ -202,7 +204,8 @@ class PodListPage extends React.Component {
 
   render() {
     const {pods, namespaces, loading, error, modalVisible, modalMode, submitting,
-      eventsDrawerVisible, eventsPod, events, eventsLoading, eventsError} = this.state;
+      eventsDrawerVisible, eventsPod, events, eventsLoading, eventsError,
+      marketplaceVisible} = this.state;
 
     const nsOptions = namespaces.map(ns => ({label: ns.name, value: ns.name}));
 
@@ -333,16 +336,32 @@ class PodListPage extends React.Component {
             >
               <Input disabled={modalMode === "edit"} placeholder="my-pod" />
             </Form.Item>
-            <Form.Item
-              label="Image"
-              name="image"
-              rules={modalMode === "add" ? [{required: true, message: "Image is required"}] : []}
-            >
-              <Input
-                disabled={modalMode === "edit"}
-                placeholder="nginx:latest"
-              />
+            <Form.Item label="Image" required={modalMode === "add"} style={{marginBottom: 0}}>
+              <Space.Compact style={{width: "100%"}}>
+                <Form.Item
+                  name="image"
+                  noStyle
+                  rules={modalMode === "add" ? [{required: true, message: "Image is required"}] : []}
+                >
+                  <Input
+                    disabled={modalMode === "edit"}
+                    placeholder="nginx:latest or browse →"
+                    style={{flex: 1}}
+                  />
+                </Form.Item>
+                {modalMode === "add" && (
+                  <Tooltip title="Browse Docker Hub">
+                    <Button
+                      icon={<AppstoreOutlined />}
+                      onClick={() => this.setState({marketplaceVisible: true})}
+                    >
+                      Browse
+                    </Button>
+                  </Tooltip>
+                )}
+              </Space.Compact>
             </Form.Item>
+            <div style={{marginBottom: 16}} />
             {modalMode === "add" && (
               <Form.Item label="Container Name" name="containerName">
                 <Input placeholder="app" />
@@ -392,6 +411,15 @@ class PodListPage extends React.Component {
             </Form.List>
           </Form>
         </Modal>
+
+        <DockerHubModal
+          open={marketplaceVisible}
+          onCancel={() => this.setState({marketplaceVisible: false})}
+          onSelect={image => {
+            this.formRef.current?.setFieldValue("image", image);
+            this.setState({marketplaceVisible: false});
+          }}
+        />
 
         <Drawer
           title={eventsPod ? `Events — ${eventsPod.namespace}/${eventsPod.name}` : "Events"}

@@ -40,6 +40,14 @@ export function getPodEvents(namespace, name) {
   }).then(res => res.json());
 }
 
+export function searchDockerHubImages(q) {
+  return fetch(`${Setting.ServerUrl}/api/search-docker-hub-images?q=${encodeURIComponent(q)}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {"Accept-Language": Setting.getAcceptLanguage()},
+  }).then(res => res.json());
+}
+
 export function deletePod(namespace, name) {
   return fetch(`${Setting.ServerUrl}/api/delete-pod`, {
     method: "POST",
