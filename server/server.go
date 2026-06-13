@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/beego/beego/v2/core/config"
@@ -58,6 +59,12 @@ func ConfigFromAppConf() (Config, error) {
 	if err != nil || dsn == "" {
 		return Config{}, fmt.Errorf("dataSourceName not set in app.conf")
 	}
+	dbName, _ := config.String("dbName")
+	if dbName == "" {
+		dbName = "casos"
+	}
+	dsn = injectDBName(dsn, dbName)
+
 	return Config{
 		DataDir:       dataDir,
 		ApiserverBind: bind,
@@ -154,6 +161,25 @@ func waitForAPIServer(ctx context.Context, base string) {
 			}
 		}
 	}
+}
+
+// injectDBName inserts dbName into a MySQL DSN of the form
+// user:pass@tcp(host:port)/ (trailing slash, no database).
+// If a database is already present it is replaced.
+func injectDBName(dsn, dbName string) string {
+	// MySQL DSN format: [user[:pass]@][protocol[(addr)]]/dbname[?params]
+	// Find the slash after the closing ')' of the address part.
+	idx := strings.LastIndex(dsn, "/")
+	if idx < 0 {
+		return dsn + dbName
+	}
+	base := dsn[:idx+1] // everything up to and including the slash
+	rest := dsn[idx+1:] // existing dbname + optional ?params
+	// Keep query params if present, replace (possibly empty) db name.
+	if q := strings.Index(rest, "?"); q >= 0 {
+		return base + dbName + rest[q:]
+	}
+	return base + dbName
 }
 
 func buildApiserverArgs(cfg Config, certDir, etcdEndpoint string) []string {

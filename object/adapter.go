@@ -2,6 +2,7 @@ package object
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/beego/beego/v2/core/config"
@@ -29,6 +30,11 @@ func InitDB() error {
 			initErr = fmt.Errorf("dataSourceName not set in app.conf")
 			return
 		}
+		dbName, _ := config.String("dbName")
+		if dbName == "" {
+			dbName = "casos"
+		}
+		dsn = injectDBName(dsn, dbName)
 
 		engine, err = xorm.NewEngine(driver, dsn)
 		if err != nil {
@@ -50,4 +56,19 @@ func InitDB() error {
 // GetEngine returns the global xorm engine. InitDB must be called first.
 func GetEngine() *xorm.Engine {
 	return engine
+}
+
+// injectDBName inserts dbName into a MySQL DSN that has no database component.
+// Mirrors the same helper in server/server.go — both honour the dbName field.
+func injectDBName(dsn, dbName string) string {
+	idx := strings.LastIndex(dsn, "/")
+	if idx < 0 {
+		return dsn + dbName
+	}
+	base := dsn[:idx+1]
+	rest := dsn[idx+1:]
+	if q := strings.Index(rest, "?"); q >= 0 {
+		return base + dbName + rest[q:]
+	}
+	return base + dbName
 }
