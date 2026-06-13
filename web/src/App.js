@@ -14,7 +14,7 @@ class App extends Component {
   renderFooter() {
     return (
       <Footer style={{textAlign: "center"}}>
-        Casos — Control Plane ©{new Date().getFullYear()}
+        CasOS ©{new Date().getFullYear()}
       </Footer>
     );
   }

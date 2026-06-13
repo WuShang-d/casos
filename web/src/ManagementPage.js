@@ -85,7 +85,7 @@ function ManagementPage(props) {
           whiteSpace: "nowrap",
           overflow: "hidden",
         }}>
-          {collapsed ? "C" : "Casos"}
+          {collapsed ? "C" : "CasOS"}
         </div>
         <Menu
           theme="dark"
@@ -114,7 +114,7 @@ function ManagementPage(props) {
               : <MenuFoldOutlined onClick={toggleCollapsed} style={{fontSize: 18, cursor: "pointer"}} />
             }
           </div>
-          <Text type="secondary" style={{fontSize: 12}}>Casos Control Plane</Text>
+          <Text type="secondary" style={{fontSize: 12}}>CasOS Control Plane</Text>
         </Header>
 
         <Content style={{margin: "24px 16px", padding: 24, background: "#fff", borderRadius: 8}}>
