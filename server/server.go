@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/beego/beego/v2/core/config"
+	"github.com/casosorg/casos/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
@@ -89,6 +90,9 @@ func Start(ctx context.Context, cfg Config) (<-chan struct{}, error) {
 	}
 
 	// Step 1: start kine (MySQL backend exposed as etcd v3 gRPC on loopback).
+	if err := util.StopOldInstance(2379); err != nil {
+		logrus.Warnf("failed to stop old instance on port 2379: %v", err)
+	}
 	// endpoint.Listen returns (ETCDConfig, error) directly — not a struct field.
 	etcdCfg, err := endpoint.Listen(ctx, endpoint.Config{
 		Endpoint:         "mysql://" + cfg.DSN,
