@@ -128,7 +128,7 @@ export function getAlgorithm(themeAlgorithmNames) {
 }
 
 export function getLogo(themes, storeLogoUrl) {
-  const defaultLogoUrl = "https://cdn.openagentai.org/img/openagent-logo_1900x450.png";
+  const defaultLogoUrl = "https://cdn.casvisor.com/casdoor/resource/built-in/admin/casos-logo_2000x500.png";
   const logoUrl = storeLogoUrl || defaultLogoUrl;
   if (Array.isArray(themes) && themes.includes("dark")) {
     return logoUrl.replace(/\.png$/, "_white.png");
@@ -147,7 +147,7 @@ export function getFooterHtml(themes, storeFooterHtml, site) {
 }
 
 export function getFaviconUrl(themes, storeFaviconUrl) {
-  const defaultFaviconUrl = "https://cdn.openagentai.org/img/openagent.png";
+  const defaultFaviconUrl = "https://cdn.casvisor.com/casdoor/resource/built-in/admin/casos-logo.png";
   const faviconUrl = storeFaviconUrl || defaultFaviconUrl;
   if (Array.isArray(themes) && themes.includes("dark")) {
     return faviconUrl.replace(/\.png$/, "_white.png");
