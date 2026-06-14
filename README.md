@@ -1,53 +1,82 @@
-# casos
+<div align="center">
 
-**casos** is an in-process Kubernetes control plane server built with Go. It embeds a full Kubernetes API server (via the k3s fork) and backs it with MySQL through [kine](https://github.com/k3s-io/kine), exposing a unified HTTP gateway that serves both the Kubernetes API and a React web UI.
+# CasOS
 
-## Architecture
+**A cloud operating system built on Kubernetes**
 
-```
-                    ┌─────────────────────────────────────┐
-                    │          Gateway (port 9000)         │
-                    │  /k8s/*  → Kubernetes API server     │
-                    │  /api/*  → Beego REST API            │
-                    │  /*      → React static files        │
-                    └────────────┬────────────────────────┘
-                                 │
-              ┌──────────────────┼──────────────────┐
-              │                  │                  │
-     ┌────────▼───────┐ ┌────────▼───────┐ ┌───────▼────────┐
-     │  Kubernetes     │ │  Beego REST    │ │  React UI      │
-     │  API Server     │ │  API (9090)    │ │  (web/build/)  │
-     │  (6443)         │ │                │ │                │
-     └────────┬───────┘ └────────┬───────┘ └────────────────┘
-              │                  │
-              └────────┬─────────┘
-                       │
-              ┌────────▼───────┐
-              │   MySQL / kine  │
-              └────────────────┘
-```
+[![Build](https://github.com/casosorg/casos/workflows/Build/badge.svg?style=flat-square)](https://github.com/casosorg/casos/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/casosorg/casos?style=flat-square&color=4f46e5)](https://github.com/casosorg/casos/releases/latest)
+[![Go Report](https://goreportcard.com/badge/github.com/casosorg/casos?style=flat-square)](https://goreportcard.com/report/github.com/casosorg/casos)
+[![License](https://img.shields.io/github/license/casosorg/casos?style=flat-square&color=22c55e)](https://github.com/casosorg/casos/blob/master/LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square)](https://github.com/casosorg/casos/releases/latest)
+[![Discord](https://img.shields.io/discord/1022748306096537660?logo=discord&label=discord&color=5865F2&style=flat-square)](https://discord.gg/5rPsrAzK7S)
+
+</div>
+
+---
+
+## What is CasOS?
+
+CasOS is a cloud operating system built on Kubernetes. It embeds the Kubernetes API server, controller manager, and scheduler, so you do **not** need an existing Kubernetes cluster or a separate control plane — CasOS is the platform itself. Run a single binary and get a fully functional cloud OS with a built-in web UI.
 
 ## Features
 
-- **Embedded Kubernetes control plane** — runs an API server in-process; no separate cluster required
-- **MySQL backend** — uses kine to translate etcd protocol to MySQL, so no etcd deployment is needed
-- **Unified gateway** — a single port routes Kubernetes API calls, REST API calls, and static assets
-- **Beego REST API** — manages Kubernetes resources (Pods, ConfigMaps, etc.) through a conventional HTTP API
-- **React web UI** — served directly from the gateway
+- Embedded Kubernetes stack (API server, controller manager, scheduler) — no external cluster needed
+- Cluster resource management: Nodes, Namespaces, Pods, Services, ConfigMaps, ServiceAccounts, ClusterRoleBindings
+- Dashboard with cluster overview
+- DockerHub image browser
+- Multi-language support (i18n)
+- Authentication via [Casdoor](https://casdoor.org)
+
+## Tech Stack
+
+| Layer    | Technology                                |
+|----------|-------------------------------------------|
+| Backend  | Go 1.25+, Beego, MySQL (ORM)              |
+| Frontend | React 18, Ant Design 6, recharts, i18next |
+| Auth     | Casdoor (OAuth2 / OIDC)                   |
+
+## Project Structure
+
+```
+casos/
+├── main.go                  # Entry point
+├── conf/app.conf            # Backend configuration
+├── controllers/             # HTTP controllers (Beego routing)
+├── object/                  # Business logic and data models
+├── routers/                 # Route configuration and filters
+├── proxy/                   # kube-proxy related logic
+└── web/                     # React frontend
+    └── src/
+        ├── App.js
+        ├── DashboardPage.js
+        ├── ManagementPage.js
+        ├── PodListPage.js
+        ├── NodeListPage.js
+        ├── NamespaceListPage.js
+        ├── ServiceListPage.js
+        ├── ConfigMapListPage.js
+        ├── ServiceAccountListPage.js
+        ├── ClusterRoleBindingListPage.js
+        └── backend/         # API client helpers
+```
 
 ## Prerequisites
 
-- Go 1.21+
-- MySQL 8.0+
-- Node.js (to build the web UI)
+- **Backend**: [Go](https://golang.org/dl/) 1.25+
+- **Frontend**: [Node.js](https://nodejs.org/) 20+ and [Yarn](https://classic.yarnpkg.com/) 1.x
+- MySQL database
+- A [Casdoor](https://casdoor.org) instance (for authentication)
+
+Supported platforms: **Linux**, **macOS**, **Windows**
 
 ## Configuration
 
-Copy and edit `conf/app.conf`:
+Edit `conf/app.conf` with your values:
 
 ```ini
 appname       = casos
-httpport      = 9090        ; internal Beego port (not exposed directly)
+httpport      = 9000
 runmode       = dev
 
 ; Database
@@ -55,50 +84,72 @@ driverName    = mysql
 dataSourceName= user:pass@tcp(host:3306)/
 dbName        = casos
 
-; Unified gateway
-gatewayPort   = 9000        ; public-facing port
+; Casdoor
+casdoorEndpoint     = https://your-casdoor-instance
+clientId            = <your-client-id>
+clientSecret        = <your-client-secret>
+casdoorOrganization = <your-org>
+casdoorApplication  = <your-app>
 
-; Control plane
+; Kubernetes control plane
 apiserverPort = 6443
 apiserverBind = 127.0.0.1
 dataDir       = /var/lib/casos
 ```
 
-## Running
+## Development
+
+### Backend
 
 ```bash
-# Build
+go run main.go
+```
+
+### Frontend
+
+```bash
+cd web
+
+# Install dependencies (first time only)
+yarn install
+
+# Start dev server — port 8001, proxies API to localhost:9000
+yarn start
+```
+
+## Deployment
+
+### Backend
+
+```bash
+# Build binary
 go build -o casos .
 
-# Run (reads conf/app.conf)
+# Run
 ./casos
 ```
 
-The server starts the Kubernetes API server, then Beego, then the gateway. Once ready:
+### Frontend
 
-- Web UI: `http://localhost:9000`
-- REST API: `http://localhost:9000/api/`
-- Kubernetes API: `https://localhost:9000/k8s/` (or directly at `https://localhost:6443`)
+```bash
+cd web
 
-## Project Structure
-
-```
-casos/
-├── conf/           # Application configuration (app.conf)
-├── controllers/    # Beego controllers (pod, configmap, etc.)
-├── object/         # Database models and initialization
-├── proxy/          # Unified HTTP gateway
-├── routers/        # Beego route registration
-├── server/         # Kubernetes control plane bootstrap
-├── util/           # Shared utilities
-├── web/            # React frontend (build/ served by gateway)
-└── main.go
+# Production build (outputs to web/build/)
+yarn build
 ```
 
-## Guides
+Serve the `web/build/` directory with any static file server, or let the Go backend serve it directly.
 
-- [Worker Node Setup (WSL2)](worker-setup.md) — connect a WSL2 Ubuntu instance as a worker node
+### Lint
+
+```bash
+cd web
+
+yarn lint:js    # ESLint
+yarn lint:css   # Stylelint
+yarn lint       # both
+```
 
 ## License
 
-See [LICENSE](LICENSE).
+[Apache 2.0](https://github.com/casosorg/casos/blob/master/LICENSE)
