@@ -189,26 +189,26 @@ function ManagementPage(props) {
 
   function getMenuItems() {
     const allItems = [
-      Setting.getItem(<Link to="/dashboard">{i18next.t("general:Dashboard", {defaultValue: "Dashboard"})}</Link>, "/dashboard", <DashboardOutlined />),
-      Setting.getItem(<Link to="/pods">{i18next.t("general:Workloads", {defaultValue: "Workloads"})}</Link>, "/workloads", <AppstoreOutlined />, [
+      Setting.getItem(<Link to="/dashboard">{i18next.t("general:Dashboard")}</Link>, "/dashboard", <DashboardOutlined />),
+      Setting.getItem(<Link to="/pods">{i18next.t("general:Workloads")}</Link>, "/workloads", <AppstoreOutlined />, [
         Setting.getItem(<Link to="/pods">{i18next.t("general:Pods")}</Link>, "/pods"),
       ]),
-      Setting.getItem(<Link to="/nodes">{i18next.t("general:Cluster", {defaultValue: "Cluster"})}</Link>, "/cluster", <ClusterOutlined />, [
-        Setting.getItem(<Link to="/nodes">{i18next.t("general:Nodes", {defaultValue: "Nodes"})}</Link>, "/nodes"),
-        Setting.getItem(<Link to="/namespaces">{i18next.t("general:Namespaces", {defaultValue: "Namespaces"})}</Link>, "/namespaces"),
+      Setting.getItem(<Link to="/nodes">{i18next.t("general:Cluster")}</Link>, "/cluster", <ClusterOutlined />, [
+        Setting.getItem(<Link to="/nodes">{i18next.t("general:Nodes")}</Link>, "/nodes"),
+        Setting.getItem(<Link to="/namespaces">{i18next.t("general:Namespaces")}</Link>, "/namespaces"),
         Setting.getItem(<Link to="/serviceaccounts">{i18next.t("general:ServiceAccounts")}</Link>, "/serviceaccounts"),
       ]),
-      Setting.getItem(<Link to="/configmaps">{i18next.t("general:Configuration", {defaultValue: "Configuration"})}</Link>, "/configuration", <SettingOutlined />, [
+      Setting.getItem(<Link to="/configmaps">{i18next.t("general:Configuration")}</Link>, "/configuration", <SettingOutlined />, [
         Setting.getItem(<Link to="/configmaps">{i18next.t("general:ConfigMaps")}</Link>, "/configmaps"),
       ]),
-      Setting.getItem(<Link to="/services">{i18next.t("general:Networking", {defaultValue: "Networking"})}</Link>, "/networking", <NodeIndexOutlined />, [
+      Setting.getItem(<Link to="/services">{i18next.t("general:Networking")}</Link>, "/networking", <NodeIndexOutlined />, [
         Setting.getItem(<Link to="/services">{i18next.t("general:Services")}</Link>, "/services"),
       ]),
-      Setting.getItem(<Link to="/clusterrolebindings">{i18next.t("general:Access Control", {defaultValue: "Access Control"})}</Link>, "/accesscontrol", <LockOutlined />, [
+      Setting.getItem(<Link to="/clusterrolebindings">{i18next.t("general:Access Control")}</Link>, "/accesscontrol", <LockOutlined />, [
         Setting.getItem(<Link to="/clusterrolebindings">{i18next.t("general:ClusterRoleBindings")}</Link>, "/clusterrolebindings"),
       ]),
-      Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Admin", {defaultValue: "Admin"})}</Link>, "/admin", <LayoutOutlined />, [
-        Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Sites", {defaultValue: "Sites"})}</Link>, "/sites"),
+      Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Admin")}</Link>, "/admin", <LayoutOutlined />, [
+        Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Sites")}</Link>, "/sites"),
       ]),
     ];
     return filterMenuItems(allItems, site?.navItems);

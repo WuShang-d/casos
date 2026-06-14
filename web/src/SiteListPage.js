@@ -54,13 +54,13 @@ class SiteListPage extends React.Component {
         render: (text) => <Link to={`/sites/${text}`}>{text}</Link>,
       },
       {
-        title: i18next.t("general:Display name", {defaultValue: "Display name"}),
+        title: i18next.t("general:Display name"),
         dataIndex: "displayName",
         key: "displayName",
         width: "200px",
       },
       {
-        title: i18next.t("site:Theme color", {defaultValue: "Theme color"}),
+        title: i18next.t("site:Theme color"),
         dataIndex: "themeColor",
         key: "themeColor",
         width: "120px",
@@ -110,7 +110,7 @@ class SiteListPage extends React.Component {
           loading={this.state.loading}
           title={() => (
             <div>
-              {i18next.t("general:Sites", {defaultValue: "Sites"})}&nbsp;&nbsp;&nbsp;&nbsp;
+              {i18next.t("general:Sites")}&nbsp;&nbsp;&nbsp;&nbsp;
               <Button type="primary" size="small" disabled>{i18next.t("general:Add")}</Button>
             </div>
           )}

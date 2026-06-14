@@ -95,42 +95,42 @@ class SiteEditPage extends React.Component {
     return (
       <div>
         <div style={{marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center"}}>
-          <span style={{fontSize: "22px", fontWeight: 600}}>{i18next.t("site:Edit Site", {defaultValue: "Edit Site"})}</span>
+          <span style={{fontSize: "22px", fontWeight: 600}}>{i18next.t("site:Edit Site")}</span>
           <Space>
             <Button onClick={() => this.submitSiteEdit()}>{i18next.t("general:Save")}</Button>
-            <Button type="primary" onClick={() => this.submitSiteEdit()}>{i18next.t("general:Save", {defaultValue: "Save"})}</Button>
+            <Button type="primary" onClick={() => this.submitSiteEdit()}>{i18next.t("general:Save")}</Button>
           </Space>
         </div>
 
-        <Card size="small" title={renderCardTitle(i18next.t("general:General Settings", {defaultValue: "General Settings"}), i18next.t("general:General Settings desc", {defaultValue: "Basic site information"}))} style={sectionCardStyle} headStyle={cardHeadStyle}>
+        <Card size="small" title={renderCardTitle(i18next.t("general:General Settings"), i18next.t("general:General Settings desc"))} style={sectionCardStyle} headStyle={cardHeadStyle}>
           <Row gutter={rowGutter}>
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Name"), i18next.t("general:Name - Tooltip", {defaultValue: "Site identifier"})),
+              Setting.getLabel(i18next.t("general:Name"), i18next.t("general:Name - Tooltip")),
               <Input value={site.name} disabled={site.name === "site-built-in"} onChange={e => this.updateSiteField("name", e.target.value)} />,
               8
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Display name"), i18next.t("general:Display name - Tooltip", {defaultValue: "Friendly name"})),
+              Setting.getLabel(i18next.t("general:Display name"), i18next.t("general:Display name - Tooltip")),
               <Input value={site.displayName} onChange={e => this.updateSiteField("displayName", e.target.value)} />,
               8
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("general:HTML title"), i18next.t("general:HTML title - Tooltip", {defaultValue: "Browser tab title"})),
+              Setting.getLabel(i18next.t("general:HTML title"), i18next.t("general:HTML title - Tooltip")),
               <Input value={site.htmlTitle} onChange={e => this.updateSiteField("htmlTitle", e.target.value)} />,
               8
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("site:Theme color", {defaultValue: "Theme color"}), i18next.t("site:Theme color - Tooltip", {defaultValue: "Primary color"})),
+              Setting.getLabel(i18next.t("site:Theme color"), i18next.t("site:Theme color - Tooltip")),
               <input type="color" value={site.themeColor || "#404040"} style={{height: "32px", width: "64px", cursor: "pointer", border: "1px solid #d9d9d9", borderRadius: "6px", padding: "2px"}} onChange={e => this.updateSiteField("themeColor", e.target.value)} />,
               8
             )}
           </Row>
         </Card>
 
-        <Card size="small" title={renderCardTitle(i18next.t("general:Branding", {defaultValue: "Branding"}), i18next.t("general:Branding desc", {defaultValue: "Logo and favicon"}))} style={sectionCardStyle} headStyle={cardHeadStyle}>
+        <Card size="small" title={renderCardTitle(i18next.t("general:Branding"), i18next.t("general:Branding desc"))} style={sectionCardStyle} headStyle={cardHeadStyle}>
           <Row gutter={rowGutter}>
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Favicon URL", {defaultValue: "Favicon URL"}), i18next.t("general:Favicon URL - Tooltip", {defaultValue: "URL to favicon image"})),
+              Setting.getLabel(i18next.t("general:Favicon URL"), i18next.t("general:Favicon URL - Tooltip")),
               <Space direction="vertical" style={{width: "100%"}}>
                 <Input prefix={<LinkOutlined />} value={site.faviconUrl} onChange={e => this.updateSiteField("faviconUrl", e.target.value)} />
                 {site.faviconUrl ? (
@@ -140,7 +140,7 @@ class SiteEditPage extends React.Component {
               12
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Logo URL", {defaultValue: "Logo URL"}), i18next.t("general:Logo URL - Tooltip", {defaultValue: "URL to logo image"})),
+              Setting.getLabel(i18next.t("general:Logo URL"), i18next.t("general:Logo URL - Tooltip")),
               <Space direction="vertical" style={{width: "100%"}}>
                 <Input prefix={<LinkOutlined />} value={site.logoUrl} onChange={e => this.updateSiteField("logoUrl", e.target.value)} />
                 {site.logoUrl ? (
@@ -150,27 +150,27 @@ class SiteEditPage extends React.Component {
               12
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Static base URL", {defaultValue: "Static base URL"}), i18next.t("general:Static base URL - Tooltip", {defaultValue: "CDN base URL for static assets"})),
+              Setting.getLabel(i18next.t("general:Static base URL"), i18next.t("general:Static base URL - Tooltip")),
               <Input prefix={<LinkOutlined />} value={site.staticBaseUrl} onChange={e => this.updateSiteField("staticBaseUrl", e.target.value)} />,
               12
             )}
           </Row>
         </Card>
 
-        <Card size="small" title={renderCardTitle(i18next.t("general:Content", {defaultValue: "Content"}), i18next.t("general:Content desc", {defaultValue: "Page content configuration"}))} style={sectionCardStyle} headStyle={cardHeadStyle}>
+        <Card size="small" title={renderCardTitle(i18next.t("general:Content"), i18next.t("general:Content desc"))} style={sectionCardStyle} headStyle={cardHeadStyle}>
           <Row gutter={rowGutter}>
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Navbar HTML", {defaultValue: "Navbar HTML"}), i18next.t("general:Navbar HTML - Tooltip", {defaultValue: "Custom HTML for the navbar"})),
+              Setting.getLabel(i18next.t("general:Navbar HTML"), i18next.t("general:Navbar HTML - Tooltip")),
               <Input.TextArea rows={3} value={site.navbarHtml} onChange={e => this.updateSiteField("navbarHtml", e.target.value)} />,
               12
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Footer HTML", {defaultValue: "Footer HTML"}), i18next.t("general:Footer HTML - Tooltip", {defaultValue: "Custom HTML for the footer"})),
+              Setting.getLabel(i18next.t("general:Footer HTML"), i18next.t("general:Footer HTML - Tooltip")),
               <Input.TextArea rows={3} value={site.footerHtml} onChange={e => this.updateSiteField("footerHtml", e.target.value)} />,
               12
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("site:Navbar items", {defaultValue: "Navbar items"}), i18next.t("site:Navbar items - Tooltip", {defaultValue: "Which menu items to show"})),
+              Setting.getLabel(i18next.t("site:Navbar items"), i18next.t("site:Navbar items - Tooltip")),
               <Tree
                 checkable
                 treeData={casosNavTreeData}
@@ -187,20 +187,20 @@ class SiteEditPage extends React.Component {
           </Row>
         </Card>
 
-        <Card size="small" title={renderCardTitle(i18next.t("site:Authentication", {defaultValue: "Authentication"}), i18next.t("site:Authentication desc", {defaultValue: "OIDC / OAuth settings"}))} style={sectionCardStyle} headStyle={cardHeadStyle}>
+        <Card size="small" title={renderCardTitle(i18next.t("site:Authentication"), i18next.t("site:Authentication desc"))} style={sectionCardStyle} headStyle={cardHeadStyle}>
           <Row gutter={rowGutter}>
             {this.renderField(
-              Setting.getLabel(i18next.t("site:OIDC issuer", {defaultValue: "OIDC issuer"}), i18next.t("site:OIDC issuer - Tooltip", {defaultValue: "OIDC provider URL"})),
+              Setting.getLabel(i18next.t("site:OIDC issuer"), i18next.t("site:OIDC issuer - Tooltip")),
               <Input prefix={<LinkOutlined />} value={site.issuer} onChange={e => this.updateSiteField("issuer", e.target.value)} />,
               12
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("provider:Client ID", {defaultValue: "Client ID"}), i18next.t("provider:Client ID - Tooltip", {defaultValue: "OAuth client ID"})),
+              Setting.getLabel(i18next.t("provider:Client ID"), i18next.t("provider:Client ID - Tooltip")),
               <Input value={site.clientId} onChange={e => this.updateSiteField("clientId", e.target.value)} />,
               6
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("provider:Client secret", {defaultValue: "Client secret"}), i18next.t("provider:Client secret - Tooltip", {defaultValue: "OAuth client secret"})),
+              Setting.getLabel(i18next.t("provider:Client secret"), i18next.t("provider:Client secret - Tooltip")),
               <Input.Password
                 value={site.clientSecret}
                 iconRender={visible => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
@@ -211,15 +211,15 @@ class SiteEditPage extends React.Component {
           </Row>
         </Card>
 
-        <Card size="small" title={renderCardTitle(i18next.t("site:Advanced", {defaultValue: "Advanced"}), i18next.t("site:Advanced desc", {defaultValue: "Advanced settings"}))} style={sectionCardStyle} headStyle={cardHeadStyle}>
+        <Card size="small" title={renderCardTitle(i18next.t("site:Advanced"), i18next.t("site:Advanced desc"))} style={sectionCardStyle} headStyle={cardHeadStyle}>
           <Row gutter={rowGutter}>
             {this.renderField(
-              Setting.getLabel(i18next.t("site:Socks5 proxy", {defaultValue: "Socks5 proxy"}), i18next.t("site:Socks5 proxy - Tooltip", {defaultValue: "Socks5 proxy address"})),
+              Setting.getLabel(i18next.t("site:Socks5 proxy"), i18next.t("site:Socks5 proxy - Tooltip")),
               <Input value={site.socks5Proxy} onChange={e => this.updateSiteField("socks5Proxy", e.target.value)} />,
               8
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("site:Log config", {defaultValue: "Log config"}), i18next.t("site:Log config - Tooltip", {defaultValue: "Log configuration JSON"})),
+              Setting.getLabel(i18next.t("site:Log config"), i18next.t("site:Log config - Tooltip")),
               <Input value={site.logConfig} onChange={e => this.updateSiteField("logConfig", e.target.value)} />,
               24
             )}
@@ -232,7 +232,7 @@ class SiteEditPage extends React.Component {
   render() {
     return (
       <div style={{background: "var(--ant-color-bg-layout)", padding: "16px 20px 32px", minHeight: "100vh"}}>
-        {this.state.site !== null ? this.renderSite() : <Loading type="page" tip={i18next.t("general:Loading...", {defaultValue: "Loading..."})} />}
+        {this.state.site !== null ? this.renderSite() : <Loading type="page" tip={i18next.t("general:Loading...")} />}
       </div>
     );
   }

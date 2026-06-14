@@ -25,7 +25,7 @@ function buildBreadcrumbItems(uri) {
   const listLabelKey = RESOURCE_LABELS[rootSegment];
   if (!listLabelKey) {return null;}
 
-  const label = i18next.t(listLabelKey, {defaultValue: rootSegment});
+  const label = i18next.t(listLabelKey);
 
   if (pathSegments.length === 1) {
     return [homeItem, {title: label}];
@@ -33,7 +33,7 @@ function buildBreadcrumbItems(uri) {
 
   const lastSegment = pathSegments[pathSegments.length - 1];
   const lastLabelKey = RESOURCE_LABELS[lastSegment];
-  const lastLabel = lastLabelKey ? i18next.t(lastLabelKey, {defaultValue: lastSegment}) : decodeURIComponent(lastSegment);
+  const lastLabel = lastLabelKey ? i18next.t(lastLabelKey) : decodeURIComponent(lastSegment);
 
   return [
     homeItem,
