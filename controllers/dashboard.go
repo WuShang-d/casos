@@ -9,10 +9,15 @@ import (
 type dashboardStats struct {
 	NodesTotal      int            `json:"nodesTotal"`
 	NodesReady      int            `json:"nodesReady"`
+	NodesByOS       map[string]int `json:"nodesByOS"`
+	NodesByArch     map[string]int `json:"nodesByArch"`
 	PodsTotal       int            `json:"podsTotal"`
+	PodsRunning     int            `json:"podsRunning"`
 	PodsByPhase     map[string]int `json:"podsByPhase"`
+	PodsByNamespace map[string]int `json:"podsByNamespace"`
 	NamespacesTotal int            `json:"namespacesTotal"`
 	ServicesTotal   int            `json:"servicesTotal"`
+	ServicesByType  map[string]int `json:"servicesByType"`
 	ConfigMapsTotal int            `json:"configMapsTotal"`
 	ServiceAccounts int            `json:"serviceAccounts"`
 }
@@ -27,7 +32,11 @@ func (c *ApiController) GetDashboard() {
 	}
 
 	stats := dashboardStats{
-		PodsByPhase: map[string]int{},
+		NodesByOS:       map[string]int{},
+		NodesByArch:     map[string]int{},
+		PodsByPhase:     map[string]int{},
+		PodsByNamespace: map[string]int{},
+		ServicesByType:  map[string]int{},
 	}
 
 	if nodes, err := object.GetNodes(cfg); err == nil {
@@ -38,6 +47,16 @@ func (c *ApiController) GetDashboard() {
 					stats.NodesReady++
 				}
 			}
+			os := n.Status.NodeInfo.OperatingSystem
+			if os == "" {
+				os = "unknown"
+			}
+			stats.NodesByOS[os]++
+			arch := n.Status.NodeInfo.Architecture
+			if arch == "" {
+				arch = "unknown"
+			}
+			stats.NodesByArch[arch]++
 		}
 	}
 
@@ -49,6 +68,14 @@ func (c *ApiController) GetDashboard() {
 				phase = "Unknown"
 			}
 			stats.PodsByPhase[phase]++
+			if phase == "Running" {
+				stats.PodsRunning++
+			}
+			ns := p.Namespace
+			if ns == "" {
+				ns = "default"
+			}
+			stats.PodsByNamespace[ns]++
 		}
 	}
 
@@ -58,6 +85,13 @@ func (c *ApiController) GetDashboard() {
 
 	if services, err := object.GetServices(cfg, ""); err == nil {
 		stats.ServicesTotal = len(services)
+		for _, svc := range services {
+			t := string(svc.Spec.Type)
+			if t == "" {
+				t = "ClusterIP"
+			}
+			stats.ServicesByType[t]++
+		}
 	}
 
 	if configMaps, err := object.GetConfigMaps(cfg, ""); err == nil {
