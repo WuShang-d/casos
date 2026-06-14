@@ -110,6 +110,7 @@ jobs:
     if: github.repository == 'casosorg/casos' && github.event_name == 'push' && needs.tag-release.outputs.new-release-published == 'true'
     needs: [ tag-release ]
     steps:
+      - uses: actions/checkout@v4
       - name: Publish release
         run: gh release edit "v${{ needs.tag-release.outputs.new-release-version }}" --draft=false
         env:
