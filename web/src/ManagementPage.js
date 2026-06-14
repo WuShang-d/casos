@@ -16,6 +16,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import * as Setting from "./Setting";
+import LanguageSelect from "./LanguageSelect";
 import PodListPage from "./PodListPage";
 import ConfigMapListPage from "./ConfigMapListPage";
 import NamespaceListPage from "./NamespaceListPage";
@@ -294,7 +295,10 @@ function ManagementPage(props) {
               style={{fontSize: 16, width: 40, height: 40}}
             />
           </div>
-          {renderAccountDropdown()}
+          <div style={{display: "flex", alignItems: "center", gap: 8}}>
+            <LanguageSelect />
+            {renderAccountDropdown()}
+          </div>
         </Header>
 
         <Content style={{display: "flex", flexDirection: "column"}}>

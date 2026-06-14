@@ -1,5 +1,6 @@
 import {message} from "antd";
 import Sdk from "casdoor-js-sdk";
+import i18next from "i18next";
 
 export let ServerUrl = "";
 
@@ -54,9 +55,23 @@ export function getItem(label, key, icon, children) {
   return {key, icon, children, label};
 }
 
-export function getAcceptLanguage() {
-  return "en";
+export function getLanguage() {
+  return i18next.language;
 }
+
+export function setLanguage(language) {
+  localStorage.setItem("language", language);
+  i18next.changeLanguage(language);
+}
+
+export function getAcceptLanguage() {
+  return getLanguage() || "en";
+}
+
+export const Countries = [
+  {key: "en", label: "English", country: "US", alt: "English"},
+  {key: "zh", label: "中文", country: "CN", alt: "中文"},
+];
 
 export function isMobile() {
   return window.innerWidth < 768;
