@@ -2,14 +2,14 @@ import React from "react";
 import {
   Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Tooltip, Typography,
 } from "antd";
+
+const {Text} = Typography;
 import {
   DeleteOutlined, EditOutlined, KeyOutlined, MinusCircleOutlined,
   PlusOutlined, ReloadOutlined, StopOutlined, CheckCircleOutlined,
 } from "@ant-design/icons";
 import * as NodeBackend from "./backend/NodeBackend";
 import * as Setting from "./Setting";
-
-const {Title, Text} = Typography;
 
 const statusColor = {
   Ready: "green",
@@ -247,19 +247,7 @@ class NodeListPage extends React.Component {
     ];
 
     return (
-      <div>
-        <Space style={{marginBottom: 16}}>
-          <Title level={4} style={{margin: 0}}>Nodes</Title>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => this.fetchNodes()}
-            loading={loading}
-            size="small"
-          >
-            Refresh
-          </Button>
-        </Space>
-
+      <div style={{padding: "24px"}}>
         {error && (
           <Alert
             type="error"
@@ -278,6 +266,20 @@ class NodeListPage extends React.Component {
           size="middle"
           pagination={{pageSize: 20}}
           locale={{emptyText: "No nodes registered. Start kubelet on a worker to join the cluster."}}
+          title={() => (
+            <div>
+              <span style={{fontWeight: 600}}>Nodes</span>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => this.fetchNodes()}
+                loading={loading}
+                size="small"
+              >
+                Refresh
+              </Button>
+            </div>
+          )}
         />
 
         {/* Label edit modal */}

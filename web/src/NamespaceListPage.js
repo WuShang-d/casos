@@ -1,10 +1,8 @@
 import React from "react";
-import {Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography} from "antd";
+import {Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag} from "antd";
 import {DeleteOutlined, PlusOutlined, ReloadOutlined, ThunderboltOutlined} from "@ant-design/icons";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
-
-const {Title} = Typography;
 
 const statusColor = {
   Active: "green",
@@ -142,27 +140,7 @@ class NamespaceListPage extends React.Component {
     ];
 
     return (
-      <div>
-        <Space style={{marginBottom: 16}}>
-          <Title level={4} style={{margin: 0}}>Namespaces</Title>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => this.fetchNamespaces()}
-            loading={loading}
-            size="small"
-          >
-            Refresh
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => this.openAddModal()}
-          >
-            Add
-          </Button>
-        </Space>
-
+      <div style={{padding: "24px"}}>
         {error && (
           <Alert
             type="error"
@@ -181,6 +159,19 @@ class NamespaceListPage extends React.Component {
           size="middle"
           pagination={{pageSize: 20}}
           locale={{emptyText: "No namespaces found"}}
+          title={() => (
+            <div>
+              <span style={{fontWeight: 600}}>Namespaces</span>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchNamespaces()} loading={loading} size="small">
+                Refresh
+              </Button>
+              &nbsp;&nbsp;
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
+                Add
+              </Button>
+            </div>
+          )}
         />
 
         <Modal

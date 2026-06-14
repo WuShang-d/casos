@@ -1,13 +1,11 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography,
+  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag,
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as ServiceAccountBackend from "./backend/ServiceAccountBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
-
-const {Title} = Typography;
 
 class ServiceAccountListPage extends React.Component {
   constructor(props) {
@@ -188,27 +186,7 @@ class ServiceAccountListPage extends React.Component {
     ];
 
     return (
-      <div>
-        <Space style={{marginBottom: 16}}>
-          <Title level={4} style={{margin: 0}}>Service Accounts</Title>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => this.fetchServiceAccounts()}
-            loading={loading}
-            size="small"
-          >
-            Refresh
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => this.openAddModal()}
-          >
-            Add
-          </Button>
-        </Space>
-
+      <div style={{padding: "24px"}}>
         {error && (
           <Alert
             type="error"
@@ -227,6 +205,19 @@ class ServiceAccountListPage extends React.Component {
           size="middle"
           pagination={{pageSize: 20}}
           locale={{emptyText: "No ServiceAccounts found"}}
+          title={() => (
+            <div>
+              <span style={{fontWeight: 600}}>Service Accounts</span>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchServiceAccounts()} loading={loading} size="small">
+                Refresh
+              </Button>
+              &nbsp;&nbsp;
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
+                Add
+              </Button>
+            </div>
+          )}
         />
 
         <Modal

@@ -1,12 +1,10 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography,
+  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag,
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as ClusterRoleBindingBackend from "./backend/ClusterRoleBindingBackend";
 import * as Setting from "./Setting";
-
-const {Title} = Typography;
 
 const SUBJECT_KINDS = ["ServiceAccount", "User", "Group"];
 
@@ -188,17 +186,7 @@ class ClusterRoleBindingListPage extends React.Component {
     ];
 
     return (
-      <div>
-        <Space style={{marginBottom: 16}}>
-          <Title level={4} style={{margin: 0}}>ClusterRoleBindings</Title>
-          <Button icon={<ReloadOutlined />} onClick={() => this.fetchCrbs()} loading={loading} size="small">
-            Refresh
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
-            Add
-          </Button>
-        </Space>
-
+      <div style={{padding: "24px"}}>
         {error && (
           <Alert type="error" message="Failed to fetch ClusterRoleBindings" description={error} style={{marginBottom: 16}} showIcon />
         )}
@@ -211,6 +199,19 @@ class ClusterRoleBindingListPage extends React.Component {
           size="middle"
           pagination={{pageSize: 20}}
           locale={{emptyText: "No ClusterRoleBindings found"}}
+          title={() => (
+            <div>
+              <span style={{fontWeight: 600}}>ClusterRoleBindings</span>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchCrbs()} loading={loading} size="small">
+                Refresh
+              </Button>
+              &nbsp;&nbsp;
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
+                Add
+              </Button>
+            </div>
+          )}
         />
 
         <Modal

@@ -1,14 +1,12 @@
 import React from "react";
 import {
-  Alert, Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography,
+  Alert, Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip,
 } from "antd";
 import {AppstoreOutlined, DeleteOutlined, EditOutlined, FileTextOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, UnorderedListOutlined} from "@ant-design/icons";
 import * as PodBackend from "./backend/PodBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
 import DockerHubModal from "./DockerHubModal";
-
-const {Title} = Typography;
 
 const phaseColor = {
   Running: "green",
@@ -327,27 +325,7 @@ class PodListPage extends React.Component {
     ];
 
     return (
-      <div>
-        <Space style={{marginBottom: 16}}>
-          <Title level={4} style={{margin: 0}}>Pods</Title>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => this.fetchPods()}
-            loading={loading}
-            size="small"
-          >
-            Refresh
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => this.openAddModal()}
-          >
-            Add
-          </Button>
-        </Space>
-
+      <div style={{padding: "24px"}}>
         {error && (
           <Alert
             type="error"
@@ -366,6 +344,19 @@ class PodListPage extends React.Component {
           size="middle"
           pagination={{pageSize: 20}}
           locale={{emptyText: "No pods found"}}
+          title={() => (
+            <div>
+              <span style={{fontWeight: 600}}>Pods</span>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchPods()} loading={loading} size="small">
+                Refresh
+              </Button>
+              &nbsp;&nbsp;
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
+                Add
+              </Button>
+            </div>
+          )}
         />
 
         <Modal

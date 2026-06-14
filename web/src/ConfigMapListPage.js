@@ -1,13 +1,11 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Typography,
+  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table,
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as ConfigMapBackend from "./backend/ConfigMapBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
-
-const {Title} = Typography;
 
 class ConfigMapListPage extends React.Component {
   constructor(props) {
@@ -182,27 +180,7 @@ class ConfigMapListPage extends React.Component {
     ];
 
     return (
-      <div>
-        <Space style={{marginBottom: 16}}>
-          <Title level={4} style={{margin: 0}}>ConfigMaps</Title>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => this.fetchConfigMaps()}
-            loading={loading}
-            size="small"
-          >
-            Refresh
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => this.openAddModal()}
-          >
-            Add
-          </Button>
-        </Space>
-
+      <div style={{padding: "24px"}}>
         {error && (
           <Alert
             type="error"
@@ -221,6 +199,19 @@ class ConfigMapListPage extends React.Component {
           size="middle"
           pagination={{pageSize: 20}}
           locale={{emptyText: "No ConfigMaps found"}}
+          title={() => (
+            <div>
+              <span style={{fontWeight: 600}}>ConfigMaps</span>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchConfigMaps()} loading={loading} size="small">
+                Refresh
+              </Button>
+              &nbsp;&nbsp;
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
+                Add
+              </Button>
+            </div>
+          )}
         />
 
         <Modal

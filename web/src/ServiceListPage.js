@@ -1,14 +1,12 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Typography,
+  Alert, Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag,
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as ServiceBackend from "./backend/ServiceBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as NodeBackend from "./backend/NodeBackend";
 import * as Setting from "./Setting";
-
-const {Title} = Typography;
 
 const SERVICE_TYPES = ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"];
 const PROTOCOLS = ["TCP", "UDP", "SCTP"];
@@ -276,17 +274,7 @@ class ServiceListPage extends React.Component {
     ];
 
     return (
-      <div>
-        <Space style={{marginBottom: 16}}>
-          <Title level={4} style={{margin: 0}}>Services</Title>
-          <Button icon={<ReloadOutlined />} onClick={() => this.fetchServices()} loading={loading} size="small">
-            Refresh
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
-            Add
-          </Button>
-        </Space>
-
+      <div style={{padding: "24px"}}>
         {error && (
           <Alert type="error" message="Failed to fetch Services" description={error} style={{marginBottom: 16}} showIcon />
         )}
@@ -299,6 +287,19 @@ class ServiceListPage extends React.Component {
           size="middle"
           pagination={{pageSize: 20}}
           locale={{emptyText: "No Services found"}}
+          title={() => (
+            <div>
+              <span style={{fontWeight: 600}}>Services</span>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchServices()} loading={loading} size="small">
+                Refresh
+              </Button>
+              &nbsp;&nbsp;
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
+                Add
+              </Button>
+            </div>
+          )}
         />
 
         <Modal
