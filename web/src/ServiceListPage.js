@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag,
+  Alert, Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as ServiceBackend from "./backend/ServiceBackend";

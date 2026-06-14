@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table,
+  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as ConfigMapBackend from "./backend/ConfigMapBackend";

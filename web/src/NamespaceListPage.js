@@ -1,5 +1,5 @@
 import React from "react";
-import {Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag} from "antd";
+import {Alert, Button, Form, Input, Modal, Popconfirm, Table, Tag} from "antd";
 import {DeleteOutlined, PlusOutlined, ReloadOutlined, ThunderboltOutlined} from "@ant-design/icons";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";

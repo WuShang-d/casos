@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Tooltip, Typography,
+  Alert, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Tooltip, Typography
 } from "antd";
 
 const {Text} = Typography;
 import {
-  DeleteOutlined, EditOutlined, KeyOutlined, MinusCircleOutlined,
-  PlusOutlined, ReloadOutlined, StopOutlined, CheckCircleOutlined,
+  CheckCircleOutlined, DeleteOutlined, EditOutlined, KeyOutlined,
+  MinusCircleOutlined, PlusOutlined, ReloadOutlined, StopOutlined
 } from "@ant-design/icons";
 import * as NodeBackend from "./backend/NodeBackend";
 import * as Setting from "./Setting";

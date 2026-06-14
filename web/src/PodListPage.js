@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Alert, Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip,
+  Alert, Button, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip
 } from "antd";
 import {AppstoreOutlined, DeleteOutlined, EditOutlined, FileTextOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, UnorderedListOutlined} from "@ant-design/icons";
 import * as PodBackend from "./backend/PodBackend";
@@ -395,7 +395,7 @@ class PodListPage extends React.Component {
                     style={{flex: 1}}
                     onChange={e => {
                       const v = e.target.value.trim();
-                      if (v) this.deriveNameFromImage(v);
+                      if (v) {this.deriveNameFromImage(v);}
                     }}
                   />
                 </Form.Item>
@@ -511,7 +511,7 @@ class PodListPage extends React.Component {
               <span style={{color: "#6e7681"}}>No logs yet…</span>
             )}
             {logs}
-            <div ref={el => { this._logsEndRef = el; }} />
+            <div ref={el => {this._logsEndRef = el;}} />
           </div>
         </Drawer>
 

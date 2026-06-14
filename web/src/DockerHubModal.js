@@ -3,11 +3,10 @@ import {Alert, Card, Input, Modal, Space, Spin, Tooltip} from "antd";
 import {AppstoreOutlined, CheckCircleFilled, SearchOutlined, StarFilled} from "@ant-design/icons";
 import * as PodBackend from "./backend/PodBackend";
 
-
 function formatPullCount(n) {
-  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+  if (n >= 1e9) {return `${(n / 1e9).toFixed(1)}B`;}
+  if (n >= 1e6) {return `${(n / 1e6).toFixed(1)}M`;}
+  if (n >= 1e3) {return `${(n / 1e3).toFixed(0)}K`;}
   return String(n);
 }
 
@@ -163,7 +162,7 @@ class DockerHubModal extends React.Component {
             ))}
             {!loading && results.length === 0 && query && (
               <div style={{gridColumn: "1/-1", textAlign: "center", color: "#bfbfbf", padding: 32}}>
-                No results for "{query}"
+                No results for &quot;{query}&quot;
               </div>
             )}
           </div>
