@@ -34,7 +34,7 @@ CasOS is a cloud operating system built on Kubernetes. It embeds the Kubernetes 
 
 | Layer    | Technology                                |
 |----------|-------------------------------------------|
-| Backend  | Go 1.25+, Beego, MySQL (ORM)              |
+| Backend  | Go 1.26+, Beego, MySQL (ORM)              |
 | Frontend | React 18, Ant Design 6, recharts, i18next |
 | Auth     | Casdoor (OAuth2 / OIDC)                   |
 
@@ -65,7 +65,7 @@ casos/
 
 ## Prerequisites
 
-- **Backend**: [Go](https://golang.org/dl/) 1.25+
+- **Backend**: [Go](https://golang.org/dl/) 1.26+
 - **Frontend**: [Node.js](https://nodejs.org/) 20+ and [Yarn](https://classic.yarnpkg.com/) 1.x
 - MySQL database
 - A [Casdoor](https://casdoor.org) instance (for authentication)
