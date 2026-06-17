@@ -2,10 +2,11 @@ import React from "react";
 import {
   Alert, Badge, Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table
 } from "antd";
-import {DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
+import {DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, ShareAltOutlined} from "@ant-design/icons";
 import * as DeploymentBackend from "./backend/DeploymentBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
+import DeploymentExposeModal from "./DeploymentExposeModal";
 
 class DeploymentListPage extends React.Component {
   constructor(props) {
@@ -19,6 +20,7 @@ class DeploymentListPage extends React.Component {
       modalMode: "add",
       submitting: false,
       editingDeploy: null,
+      exposeDeploy: null,
     };
     this.formRef = React.createRef();
   }
@@ -140,7 +142,7 @@ class DeploymentListPage extends React.Component {
   }
 
   render() {
-    const {deployments, namespaces, loading, error, modalVisible, modalMode, submitting} = this.state;
+    const {deployments, namespaces, loading, error, modalVisible, modalMode, submitting, exposeDeploy} = this.state;
 
     const nsOptions = namespaces.map(ns => ({label: ns.name, value: ns.name}));
 
@@ -170,7 +172,7 @@ class DeploymentListPage extends React.Component {
       {
         title: "Actions",
         key: "actions",
-        width: 140,
+        width: 210,
         render: (_, record) => (
           <Space>
             <Button
@@ -179,6 +181,13 @@ class DeploymentListPage extends React.Component {
               onClick={() => this.openEditModal(record)}
             >
               Edit
+            </Button>
+            <Button
+              size="small"
+              icon={<ShareAltOutlined />}
+              onClick={() => this.setState({exposeDeploy: record})}
+            >
+              Expose
             </Button>
             <Popconfirm
               title={`Delete Deployment "${record.name}"?`}
@@ -227,6 +236,12 @@ class DeploymentListPage extends React.Component {
               </Button>
             </div>
           )}
+        />
+
+        <DeploymentExposeModal
+          deploy={exposeDeploy}
+          open={exposeDeploy !== null}
+          onClose={() => this.setState({exposeDeploy: null})}
         />
 
         <Modal
