@@ -168,4 +168,5 @@ func (a *Ormer) createTable() {
 	showSql := conf.GetConfigBool("showSql")
 	a.Engine.ShowSQL(showSql)
 	_ = a.Engine.Sync2(new(Site))
+	_ = a.Engine.Sync2(new(CasbinRule))
 }

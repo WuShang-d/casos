@@ -164,6 +164,58 @@ func ensureCerts(dir, ip, advertiseIP string) error {
 	return nil
 }
 
+// EnsureWebhookCert generates a TLS cert for the admission webhook server
+// signed by the casos CA, valid for 127.0.0.1.
+func EnsureWebhookCert(certDir string) error {
+	certFile := filepath.Join(certDir, "webhook.crt")
+	keyFile := filepath.Join(certDir, "webhook.key")
+	if fileExists(certFile) && fileExists(keyFile) {
+		return nil
+	}
+
+	caKeyPEM, err := os.ReadFile(filepath.Join(certDir, "ca.key"))
+	if err != nil {
+		return fmt.Errorf("read ca.key: %w", err)
+	}
+	block, _ := pem.Decode(caKeyPEM)
+	caKey, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("parse ca key: %w", err)
+	}
+	caCertPEM, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
+	if err != nil {
+		return fmt.Errorf("read ca.crt: %w", err)
+	}
+	block, _ = pem.Decode(caCertPEM)
+	caCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("parse ca cert: %w", err)
+	}
+
+	whKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return err
+	}
+	whTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(10),
+		Subject:      pkix.Name{CommonName: "casos-webhook"},
+		NotBefore:    time.Now().Add(-time.Minute),
+		NotAfter:     time.Now().Add(10 * 365 * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	whDER, err := x509.CreateCertificate(rand.Reader, whTemplate, caCert, &whKey.PublicKey, caKey)
+	if err != nil {
+		return err
+	}
+	if err := writePEM(certFile, "CERTIFICATE", whDER); err != nil {
+		return err
+	}
+	whKeyDER, _ := x509.MarshalECPrivateKey(whKey)
+	return writePEM(keyFile, "EC PRIVATE KEY", whKeyDER)
+}
+
 // ensureServiceAccountKey generates an RSA key pair for service-account token
 // signing/verification if not already present.
 func ensureServiceAccountKey(dir string) error {

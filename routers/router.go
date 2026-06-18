@@ -97,4 +97,9 @@ func InitAPI() {
 
 	beego.Router("/api/deploy-app", &controllers.ApiController{}, "POST:DeployApp")
 	beego.Router("/api/get-app-templates", &controllers.ApiController{}, "GET:GetAppTemplates")
+
+	beego.Router("/api/get-casbin-rules", &controllers.ApiController{}, "GET:GetCasbinRules")
+	beego.Router("/api/add-casbin-rule", &controllers.ApiController{}, "POST:AddCasbinRule")
+	beego.Router("/api/delete-casbin-rule", &controllers.ApiController{}, "POST:DeleteCasbinRule")
+	beego.Router("/api/reload-casbin-enforcer", &controllers.ApiController{}, "POST:ReloadCasbinEnforcer")
 }

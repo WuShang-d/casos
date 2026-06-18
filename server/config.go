@@ -14,6 +14,7 @@ type Config struct {
 	ApiserverBind    string // actual bind / SAN IP (may be loopback in dev)
 	AdvertiseAddress string // non-loopback IP registered as kubernetes service endpoint
 	ApiserverPort    int
+	WebhookPort      int    // HTTPS port for the Casbin admission webhook server
 	DSN              string // MySQL DSN forwarded to kine
 	SandboxImage     string // containerd sandbox (pause) image, empty = upstream default
 	Socks5Proxy      string // outbound socks5 proxy, e.g. 127.0.0.1:10808
@@ -48,6 +49,11 @@ func ConfigFromAppConf() (Config, error) {
 		advertise = bind
 	}
 
+	webhookPort, _ := beego.AppConfig.Int("webhookPort")
+	if webhookPort == 0 {
+		webhookPort = 9443
+	}
+
 	socks5Proxy := beego.AppConfig.String("socks5Proxy")
 
 	sandboxImage := beego.AppConfig.String("sandboxImage")
@@ -64,6 +70,7 @@ func ConfigFromAppConf() (Config, error) {
 		ApiserverBind:    bind,
 		AdvertiseAddress: advertise,
 		ApiserverPort:    port,
+		WebhookPort:      webhookPort,
 		DSN:              dsn,
 		SandboxImage:     sandboxImage,
 		Socks5Proxy:      socks5Proxy,

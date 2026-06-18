@@ -27,6 +27,9 @@ func main() {
 	object.InitAdapter()
 	object.CreateTables()
 	object.InitSite()
+	if err := object.ReloadEnforcer(); err != nil {
+		logs.Warning("casbin enforcer init: %v", err)
+	}
 	casdoor.InitCasdoorConfig()
 	proxy.InitHttpClient()
 
@@ -44,13 +47,17 @@ func main() {
 	}
 	controllers.SetServerConfig(&srvCfg)
 
+	if err := server.StartAdmissionWebhook(srvCfg); err != nil {
+		logs.Warning("admission webhook: %v", err)
+	}
+
 	go func() {
 		select {
 		case <-readyCh:
 			adminCfg := server.AdminRestConfig(srvCfg)
 			controllers.SetAdminRestConfig(adminCfg)
 			logs.Info("apiserver ready — kubectl endpoint: https://127.0.0.1:%d", srvCfg.ApiserverPort)
-			if err := server.Bootstrap(ctx, adminCfg); err != nil {
+			if err := server.Bootstrap(ctx, adminCfg, srvCfg); err != nil {
 				logs.Warning("bootstrap: %v", err)
 			}
 			if err := server.StartScheduler(ctx, srvCfg); err != nil {
