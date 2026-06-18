@@ -14,6 +14,7 @@
     "Cluster": "Cluster",
     "ClusterRoleBindings": "Cluster Role Bindings",
     "ConfigMaps": "ConfigMaps",
+    "Secrets": "Secrets",
     "Configuration": "Configuration",
     "Content": "Content",
     "Content desc": "Page content configuration",

@@ -14,6 +14,7 @@
     "Cluster": "集群",
     "ClusterRoleBindings": "集群角色绑定",
     "ConfigMaps": "配置字典",
+    "Secrets": "密钥",
     "Configuration": "配置",
     "Content": "内容",
     "Content desc": "页面内容配置",

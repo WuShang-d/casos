@@ -11,6 +11,7 @@ const RESOURCE_LABELS = {
   "namespaces": "general:Namespaces",
   "serviceaccounts": "general:ServiceAccounts",
   "configmaps": "general:ConfigMaps",
+  "secrets": "general:Secrets",
   "services": "general:Services",
   "clusterrolebindings": "general:ClusterRoleBindings",
   "sites": "general:Sites",

@@ -24,6 +24,7 @@ import BreadcrumbBar from "./common/BreadcrumbBar";
 import PodListPage from "./PodListPage";
 import DeploymentListPage from "./DeploymentListPage";
 import ConfigMapListPage from "./ConfigMapListPage";
+import SecretListPage from "./SecretListPage";
 import NamespaceListPage from "./NamespaceListPage";
 import NodeListPage from "./NodeListPage";
 import ServiceAccountListPage from "./ServiceAccountListPage";
@@ -41,7 +42,7 @@ function getMenuParentKey(uri) {
   if (uri === "/dashboard") {return null;}
   if (uri.includes("/pods") || uri.includes("/deployments")) {return "/workloads";}
   if (uri.includes("/nodes") || uri.includes("/namespaces") || uri.includes("/serviceaccounts")) {return "/cluster";}
-  if (uri.includes("/configmaps")) {return "/configuration";}
+  if (uri.includes("/configmaps") || uri.includes("/secrets")) {return "/configuration";}
   if (uri.includes("/services")) {return "/networking";}
   if (uri.includes("/clusterrolebindings")) {return "/accesscontrol";}
   if (uri.includes("/sites")) {return "/admin";}
@@ -204,6 +205,7 @@ function ManagementPage(props) {
       ]),
       Setting.getItem(<Link to="/configmaps">{i18next.t("general:Configuration")}</Link>, "/configuration", <SettingOutlined />, [
         Setting.getItem(<Link to="/configmaps">{i18next.t("general:ConfigMaps")}</Link>, "/configmaps"),
+        Setting.getItem(<Link to="/secrets">{i18next.t("general:Secrets")}</Link>, "/secrets"),
       ]),
       Setting.getItem(<Link to="/services">{i18next.t("general:Networking")}</Link>, "/networking", <NodeIndexOutlined />, [
         Setting.getItem(<Link to="/services">{i18next.t("general:Services")}</Link>, "/services"),
@@ -229,6 +231,7 @@ function ManagementPage(props) {
         <Route exact path="/namespaces" render={(props) => <NamespaceListPage {...props} />} />
         <Route exact path="/serviceaccounts" render={(props) => <ServiceAccountListPage {...props} />} />
         <Route exact path="/configmaps" render={(props) => <ConfigMapListPage {...props} />} />
+        <Route exact path="/secrets" render={(props) => <SecretListPage {...props} />} />
         <Route exact path="/services" render={(props) => <ServiceListPage {...props} />} />
         <Route exact path="/clusterrolebindings" render={(props) => <ClusterRoleBindingListPage {...props} />} />
         <Route exact path="/sites" render={(props) => <SiteListPage account={account} {...props} />} />
