@@ -12,14 +12,15 @@ import (
 )
 
 type deploymentSummary struct {
-	Namespace         string `json:"namespace"`
-	Name              string `json:"name"`
-	Replicas          int32  `json:"replicas"`
-	ReadyReplicas     int32  `json:"readyReplicas"`
-	AvailableReplicas int32  `json:"availableReplicas"`
-	Image             string `json:"image"`
-	CreatedAt         string `json:"createdAt"`
-	ResourceVersion   string `json:"resourceVersion"`
+	Namespace         string          `json:"namespace"`
+	Name              string          `json:"name"`
+	Replicas          int32           `json:"replicas"`
+	ReadyReplicas     int32           `json:"readyReplicas"`
+	AvailableReplicas int32           `json:"availableReplicas"`
+	Image             string          `json:"image"`
+	EnvVars           []envVarSummary `json:"envVars"`
+	CreatedAt         string          `json:"createdAt"`
+	ResourceVersion   string          `json:"resourceVersion"`
 }
 
 func toDeploymentSummary(d appsv1.Deployment) deploymentSummary {
@@ -38,6 +39,7 @@ func toDeploymentSummary(d appsv1.Deployment) deploymentSummary {
 		ReadyReplicas:     d.Status.ReadyReplicas,
 		AvailableReplicas: d.Status.AvailableReplicas,
 		Image:             image,
+		EnvVars:           extractEnvVars(d.Spec.Template.Spec.Containers),
 		CreatedAt:         d.CreationTimestamp.UTC().Format("2006-01-02 15:04:05"),
 		ResourceVersion:   d.ResourceVersion,
 	}
@@ -83,14 +85,15 @@ func (c *ApiController) GetDeployment() {
 }
 
 type deploymentRequest struct {
-	Namespace       string `json:"namespace"`
-	Name            string `json:"name"`
-	Replicas        int32  `json:"replicas"`
-	ContainerName   string `json:"containerName"`
-	Image           string `json:"image"`
-	CpuRequest      string `json:"cpuRequest"`
-	MemoryRequest   string `json:"memoryRequest"`
-	ResourceVersion string `json:"resourceVersion"`
+	Namespace       string          `json:"namespace"`
+	Name            string          `json:"name"`
+	Replicas        int32           `json:"replicas"`
+	ContainerName   string          `json:"containerName"`
+	Image           string          `json:"image"`
+	CpuRequest      string          `json:"cpuRequest"`
+	MemoryRequest   string          `json:"memoryRequest"`
+	EnvVars         []envVarRequest `json:"envVars"`
+	ResourceVersion string          `json:"resourceVersion"`
 }
 
 func buildDeployment(req deploymentRequest) *appsv1.Deployment {
@@ -106,6 +109,7 @@ func buildDeployment(req deploymentRequest) *appsv1.Deployment {
 	container := corev1.Container{
 		Name:  containerName,
 		Image: req.Image,
+		Env:   buildEnvVars(req.EnvVars),
 	}
 
 	if req.CpuRequest != "" || req.MemoryRequest != "" {
@@ -197,12 +201,17 @@ func (c *ApiController) UpdateDeployment() {
 	existing.Spec.Replicas = &replicas
 	if len(existing.Spec.Template.Spec.Containers) > 0 {
 		existing.Spec.Template.Spec.Containers[0].Image = req.Image
+		existing.Spec.Template.Spec.Containers[0].Env = buildEnvVars(req.EnvVars)
 	} else {
 		containerName := req.ContainerName
 		if containerName == "" {
 			containerName = req.Name
 		}
-		existing.Spec.Template.Spec.Containers = []corev1.Container{{Name: containerName, Image: req.Image}}
+		existing.Spec.Template.Spec.Containers = []corev1.Container{{
+			Name:  containerName,
+			Image: req.Image,
+			Env:   buildEnvVars(req.EnvVars),
+		}}
 	}
 	existing.ResourceVersion = req.ResourceVersion
 
