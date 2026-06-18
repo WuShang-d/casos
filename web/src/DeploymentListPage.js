@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Alert, Badge, Button, Divider, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Typography
+  Alert, Button, Divider, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Typography
 } from "antd";
 import {DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, ShareAltOutlined} from "@ant-design/icons";
 import * as DeploymentBackend from "./backend/DeploymentBackend";
@@ -10,6 +10,7 @@ import * as SecretBackend from "./backend/SecretBackend";
 import * as Setting from "./Setting";
 import DeploymentExposeModal from "./DeploymentExposeModal";
 import EnvVarEditor, {ENV_SOURCE_CONFIGMAP, ENV_SOURCE_PLAIN, ENV_SOURCE_SECRET} from "./EnvVarEditor";
+import ReplicasControl from "./ReplicasControl";
 
 const {Text} = Typography;
 
@@ -193,18 +194,22 @@ class DeploymentListPage extends React.Component {
       {
         title: "Replicas",
         key: "replicas",
-        width: 120,
-        render: (_, r) => `${r.readyReplicas ?? 0} / ${r.replicas ?? 0}`,
-      },
-      {
-        title: "Available",
-        dataIndex: "availableReplicas",
-        key: "availableReplicas",
-        width: 100,
-        render: (v, r) => (
-          <Badge
-            status={v >= (r.replicas ?? 0) && (r.replicas ?? 0) > 0 ? "success" : "warning"}
-            text={v ?? 0}
+        width: 200,
+        render: (_, r) => (
+          <ReplicasControl
+            readyReplicas={r.readyReplicas ?? 0}
+            replicas={r.replicas ?? 0}
+            onScale={n => DeploymentBackend.updateDeployment({...r, replicas: n}).then(res => {
+              if (res.status === "ok") {
+                this.setState(prev => ({
+                  deployments: prev.deployments.map(d =>
+                    d.namespace === r.namespace && d.name === r.name ? res.data : d
+                  ),
+                }));
+              } else {
+                Setting.showMessage("error", res.msg);
+              }
+            }).catch(e => Setting.showMessage("error", e.message))}
           />
         ),
       },
