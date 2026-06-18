@@ -47,8 +47,8 @@ func main() {
 	}
 	controllers.SetServerConfig(&srvCfg)
 
-	if err := server.StartAdmissionWebhook(srvCfg); err != nil {
-		logs.Warning("admission webhook: %v", err)
+	if err := server.StartWebhookServer(srvCfg); err != nil {
+		logs.Warning("webhook server: %v", err)
 	}
 
 	go func() {

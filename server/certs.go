@@ -216,6 +216,58 @@ func EnsureWebhookCert(certDir string) error {
 	return writePEM(keyFile, "EC PRIVATE KEY", whKeyDER)
 }
 
+// EnsureAuthzWebhookConfig writes (once) the kubeconfig that the apiserver
+// uses to reach the Casbin authorization webhook.
+func EnsureAuthzWebhookConfig(certDir string, webhookPort int) (string, error) {
+	path := filepath.Join(certDir, "authz-webhook.kubeconfig")
+	if fileExists(path) {
+		return path, nil
+	}
+
+	caData, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
+	if err != nil {
+		return "", fmt.Errorf("read ca.crt: %w", err)
+	}
+	certData, err := os.ReadFile(filepath.Join(certDir, "admin.crt"))
+	if err != nil {
+		return "", fmt.Errorf("read admin.crt: %w", err)
+	}
+	keyData, err := os.ReadFile(filepath.Join(certDir, "admin.key"))
+	if err != nil {
+		return "", fmt.Errorf("read admin.key: %w", err)
+	}
+
+	kubeconfig := fmt.Sprintf(`apiVersion: v1
+kind: Config
+clusters:
+- name: authz-webhook
+  cluster:
+    certificate-authority-data: %s
+    server: https://127.0.0.1:%d/authorization/authorize
+users:
+- name: casos
+  user:
+    client-certificate-data: %s
+    client-key-data: %s
+contexts:
+- context:
+    cluster: authz-webhook
+    user: casos
+  name: default
+current-context: default
+`,
+		base64.StdEncoding.EncodeToString(caData),
+		webhookPort,
+		base64.StdEncoding.EncodeToString(certData),
+		base64.StdEncoding.EncodeToString(keyData),
+	)
+
+	if err := os.WriteFile(path, []byte(kubeconfig), 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // ensureServiceAccountKey generates an RSA key pair for service-account token
 // signing/verification if not already present.
 func ensureServiceAccountKey(dir string) error {

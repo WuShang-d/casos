@@ -1,11 +1,8 @@
 package server
 
 import (
-	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"path/filepath"
 
 	"github.com/beego/beego/logs"
 	"github.com/casosorg/casos/object"
@@ -13,46 +10,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StartAdmissionWebhook generates the webhook TLS cert (if absent) and
-// launches the HTTPS server. Callers only need to pass the server Config.
-func StartAdmissionWebhook(cfg Config) error {
-	certDir := cfg.DataDir + "/tls"
-	if err := EnsureWebhookCert(certDir); err != nil {
-		return fmt.Errorf("webhook cert: %w", err)
-	}
-	return StartAdmissionServer(certDir, cfg.WebhookPort)
-}
-
-// StartAdmissionServer launches an HTTPS server on webhookPort serving the
-// Casbin ValidatingAdmissionWebhook endpoint.
-func StartAdmissionServer(certDir string, webhookPort int) error {
-	certFile := filepath.Join(certDir, "webhook.crt")
-	keyFile := filepath.Join(certDir, "webhook.key")
-
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return fmt.Errorf("load webhook cert: %w", err)
-	}
-
-	mux := http.NewServeMux()
+// RegisterAdmissionHandler mounts the ValidatingAdmissionWebhook endpoint on mux.
+func RegisterAdmissionHandler(mux *http.ServeMux) {
 	mux.HandleFunc("/admission/validate", admissionValidateHandler)
-
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", webhookPort),
-		Handler: mux,
-		TLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
-		},
-	}
-
-	go func() {
-		logs.Info("admission webhook server listening on :%d", webhookPort)
-		if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			logs.Error("admission webhook server error: %v", err)
-		}
-	}()
-	return nil
 }
 
 func admissionValidateHandler(w http.ResponseWriter, r *http.Request) {

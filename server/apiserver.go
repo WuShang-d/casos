@@ -61,7 +61,13 @@ func Start(ctx context.Context, cfg Config) (<-chan struct{}, error) {
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
-	if err := fs.Parse(buildApiserverArgs(cfg, certDir, etcdCfg.Endpoints[0])); err != nil {
+	authzKubeconfig, err := EnsureAuthzWebhookConfig(certDir, cfg.WebhookPort)
+	if err != nil {
+		logrus.Warnf("authz webhook kubeconfig: %v — authorization webhook disabled", err)
+		authzKubeconfig = ""
+	}
+
+	if err := fs.Parse(buildApiserverArgs(cfg, certDir, etcdCfg.Endpoints[0], authzKubeconfig)); err != nil {
 		return nil, fmt.Errorf("apiserver flag parse: %w", err)
 	}
 
@@ -116,17 +122,24 @@ func waitForAPIServer(ctx context.Context, base string) {
 	}
 }
 
-func buildApiserverArgs(cfg Config, certDir, etcdEndpoint string) []string {
+func authzMode(kubeconfig string) string {
+	if kubeconfig != "" {
+		return "Node,RBAC,Webhook"
+	}
+	return "Node,RBAC"
+}
+
+func buildApiserverArgs(cfg Config, certDir, etcdEndpoint, authzKubeconfig string) []string {
 	saKey := filepath.Join(certDir, "sa.key")
 	saPub := filepath.Join(certDir, "sa.pub")
-	return []string{
+	args := []string{
 		"--advertise-address=" + cfg.AdvertiseAddress,
 		"--bind-address=0.0.0.0",
 		fmt.Sprintf("--secure-port=%d", cfg.ApiserverPort),
 		"--etcd-servers=" + etcdEndpoint,
 		"--service-cluster-ip-range=10.43.0.0/16",
 		"--allow-privileged=true",
-		"--authorization-mode=Node,RBAC",
+		"--authorization-mode=" + authzMode(authzKubeconfig),
 		"--enable-admission-plugins=NodeRestriction,ValidatingAdmissionWebhook",
 		"--tls-cert-file=" + filepath.Join(certDir, "apiserver.crt"),
 		"--tls-private-key-file=" + filepath.Join(certDir, "apiserver.key"),
@@ -139,6 +152,14 @@ func buildApiserverArgs(cfg Config, certDir, etcdEndpoint string) []string {
 		"--kubelet-client-certificate=" + filepath.Join(certDir, "apiserver-kubelet-client.crt"),
 		"--kubelet-client-key=" + filepath.Join(certDir, "apiserver-kubelet-client.key"),
 	}
+	if authzKubeconfig != "" {
+		args = append(args,
+			"--authorization-webhook-config-file="+authzKubeconfig,
+			"--authorization-webhook-cache-authorized-ttl=30s",
+			"--authorization-webhook-cache-unauthorized-ttl=10s",
+		)
+	}
+	return args
 }
 
 // deleteStaleKubernetesEndpoints removes the default/kubernetes Endpoints object

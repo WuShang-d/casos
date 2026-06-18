@@ -224,9 +224,9 @@ class CasbinRuleListPage extends React.Component {
 
         <div style={{marginBottom: 12, padding: "8px 12px", background: "rgba(22,119,255,0.05)", borderRadius: 6, border: "1px solid rgba(22,119,255,0.15)"}}>
           <Text type="secondary" style={{fontSize: 12}}>
-            Rules are enforced by the in-process ValidatingAdmissionWebhook (<Text code style={{fontSize: 11}}>casbin-admission</Text>). <strong>p</strong> = allow policy (subject, namespace, resource, action).
-            <strong> g</strong> = role assignment (user → role). Use <Text code style={{fontSize: 11}}>*</Text> as wildcard.
-            When no rules exist, all requests are allowed.
+            The same rules are enforced by two in-process webhooks: <strong>ValidatingAdmissionWebhook</strong> (<Text code style={{fontSize: 11}}>casbin-admission</Text>) intercepts write operations before resources are persisted, and <strong>Authorization Webhook</strong> intercepts every API request (get / list / watch / create …) before it reaches RBAC.
+            <br />
+            <strong>p</strong> = allow policy (subject, namespace, resource, action) · <strong>g</strong> = role assignment (user → role) · <Text code style={{fontSize: 11}}>*</Text> = wildcard · system:* users bypass the authorization webhook. When no rules exist, all requests are allowed.
           </Text>
         </div>
 
