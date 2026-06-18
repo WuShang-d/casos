@@ -5,6 +5,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -243,5 +244,12 @@ func (c *ApiController) DeleteDeployment() {
 		c.ResponseError(err.Error())
 		return
 	}
+
+	// Best-effort: delete a same-named Service if it exists
+	if err := object.DeleteService(cfg, req.Namespace, req.Name); err != nil && !errors.IsNotFound(err) {
+		c.ResponseError(err.Error())
+		return
+	}
+
 	c.ResponseOk()
 }

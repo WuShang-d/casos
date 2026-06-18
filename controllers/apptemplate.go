@@ -168,13 +168,13 @@ type sealosInput struct {
 
 type sealosTemplateCRD struct {
 	Spec struct {
-		Title       string                  `yaml:"title"`
-		Description string                  `yaml:"description"`
-		Icon        string                  `yaml:"icon"`
-		GitRepo     string                  `yaml:"gitRepo"`
-		URL         string                  `yaml:"url"`
-		Categories  []string                `yaml:"categories"`
-		Inputs      map[string]sealosInput  `yaml:"inputs"`
+		Title       string                 `yaml:"title"`
+		Description string                 `yaml:"description"`
+		Icon        string                 `yaml:"icon"`
+		GitRepo     string                 `yaml:"gitRepo"`
+		URL         string                 `yaml:"url"`
+		Categories  []string               `yaml:"categories"`
+		Inputs      map[string]sealosInput `yaml:"inputs"`
 	} `yaml:"spec"`
 }
 
