@@ -2,9 +2,12 @@ package object
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 )
 
@@ -54,4 +57,30 @@ func DeleteDeployment(cfg *rest.Config, namespace, name string) error {
 		return err
 	}
 	return client.AppsV1().Deployments(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+}
+
+func RestartDeployment(cfg *rest.Config, namespace, name string) error {
+	client, err := newClient(cfg)
+	if err != nil {
+		return err
+	}
+	patch := map[string]interface{}{
+		"spec": map[string]interface{}{
+			"template": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"annotations": map[string]string{
+						"casos.io/restartedAt": time.Now().UTC().Format(time.RFC3339),
+					},
+				},
+			},
+		},
+	}
+	data, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+	_, err = client.AppsV1().Deployments(namespace).Patch(
+		context.Background(), name, types.MergePatchType, data, metav1.PatchOptions{},
+	)
+	return err
 }

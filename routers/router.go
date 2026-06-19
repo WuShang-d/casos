@@ -96,6 +96,7 @@ func InitAPI() {
 	beego.Router("/api/add-deployment", &controllers.ApiController{}, "POST:AddDeployment")
 	beego.Router("/api/update-deployment", &controllers.ApiController{}, "POST:UpdateDeployment")
 	beego.Router("/api/delete-deployment", &controllers.ApiController{}, "POST:DeleteDeployment")
+	beego.Router("/api/restart-deployment", &controllers.ApiController{}, "POST:RestartDeployment")
 
 	beego.Router("/api/deploy-app", &controllers.ApiController{}, "POST:DeployApp")
 	beego.Router("/api/get-app-templates", &controllers.ApiController{}, "GET:GetAppTemplates")

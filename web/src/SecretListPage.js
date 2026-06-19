@@ -1,11 +1,12 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table
+  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as SecretBackend from "./backend/SecretBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
+import RestartDeploymentsModal from "./RestartDeploymentsModal";
 
 const SECRET_TYPES = [
   {label: "Opaque", value: "Opaque"},
@@ -28,6 +29,7 @@ class SecretListPage extends React.Component {
       modalMode: "add",
       submitting: false,
       editingSecret: null,
+      restartTarget: null,
     };
     this.formRef = React.createRef();
   }
@@ -39,9 +41,7 @@ class SecretListPage extends React.Component {
 
   fetchNamespaces() {
     NamespaceBackend.getNamespaces().then(res => {
-      if (res.status === "ok") {
-        this.setState({namespaces: res.data ?? []});
-      }
+      if (res.status === "ok") {this.setState({namespaces: res.data ?? []});}
     }).catch(() => {});
   }
 
@@ -76,10 +76,8 @@ class SecretListPage extends React.Component {
     this.setState({modalVisible: true, modalMode: "edit", editingSecret: secret}, () => {
       setTimeout(() => {
         this.formRef.current?.setFieldsValue({
-          name: secret.name,
-          namespace: secret.namespace,
-          type: secret.type || "Opaque",
-          dataEntries,
+          name: secret.name, namespace: secret.namespace,
+          type: secret.type || "Opaque", dataEntries,
         });
       }, 0);
     });
@@ -93,16 +91,9 @@ class SecretListPage extends React.Component {
     this.formRef.current?.validateFields().then(values => {
       const stringData = {};
       (values.dataEntries ?? []).forEach(({key, value}) => {
-        if (key) {
-          stringData[key] = value ?? "";
-        }
+        if (key) {stringData[key] = value ?? "";}
       });
-      const payload = {
-        name: values.name,
-        namespace: values.namespace,
-        type: values.type,
-        stringData,
-      };
+      const payload = {name: values.name, namespace: values.namespace, type: values.type, stringData};
 
       this.setState({submitting: true});
 
@@ -119,14 +110,12 @@ class SecretListPage extends React.Component {
           .finally(() => this.setState({submitting: false}));
       } else {
         const s = this.state.editingSecret;
-        SecretBackend.updateSecret({
-          ...payload,
-          resourceVersion: s.resourceVersion,
-        }).then(res => {
+        SecretBackend.updateSecret({...payload, resourceVersion: s.resourceVersion}).then(res => {
           if (res.status === "ok") {
             Setting.showMessage("success", "Secret updated");
             this.closeModal();
             this.fetchSecrets();
+            this.setState({restartTarget: {namespace: s.namespace, name: s.name}});
           } else {
             Setting.showMessage("error", res.msg);
           }
@@ -148,20 +137,25 @@ class SecretListPage extends React.Component {
   }
 
   render() {
-    const {secrets, namespaces, loading, error, modalVisible, modalMode, submitting} = this.state;
+    const {secrets, namespaces, loading, error, modalVisible, modalMode, submitting, restartTarget} = this.state;
 
     const nsOptions = namespaces.map(ns => ({label: ns.name, value: ns.name}));
 
     const columns = [
       {title: "Namespace", dataIndex: "namespace", key: "namespace", width: 160},
-      {title: "Name", dataIndex: "name", key: "name"},
-      {title: "Type", dataIndex: "type", key: "type", width: 220},
+      {title: "Name", dataIndex: "name", key: "name", width: 200},
+      {title: "Type", dataIndex: "type", key: "type", width: 200},
       {
-        title: "Data Keys",
-        dataIndex: "dataKeys",
-        key: "dataKeys",
-        width: 110,
-        render: v => v ?? 0,
+        title: "Keys",
+        dataIndex: "stringData",
+        key: "keys",
+        render: data => (
+          <Space size={4} wrap>
+            {Object.keys(data ?? {}).map(k => (
+              <Tag key={k} color="orange" style={{fontFamily: "monospace", fontSize: 11}}>{k}</Tag>
+            ))}
+          </Space>
+        ),
       },
       {title: "Created", dataIndex: "createdAt", key: "createdAt", width: 180},
       {
@@ -170,18 +164,10 @@ class SecretListPage extends React.Component {
         width: 140,
         render: (_, record) => (
           <Space>
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => this.openEditModal(record)}
-            >
-              Edit
-            </Button>
+            <Button size="small" icon={<EditOutlined />} onClick={() => this.openEditModal(record)}>Edit</Button>
             <Popconfirm
               title={`Delete Secret "${record.name}"?`}
-              okText="Delete"
-              okType="danger"
-              cancelText="Cancel"
+              okText="Delete" okType="danger" cancelText="Cancel"
               onConfirm={() => this.handleDelete(record)}
             >
               <Button size="small" danger icon={<DeleteOutlined />}>Delete</Button>
@@ -194,13 +180,7 @@ class SecretListPage extends React.Component {
     return (
       <div style={{padding: "24px"}}>
         {error && (
-          <Alert
-            type="error"
-            message="Failed to fetch Secrets"
-            description={error}
-            style={{marginBottom: 16}}
-            showIcon
-          />
+          <Alert type="error" message="Failed to fetch Secrets" description={error} style={{marginBottom: 16}} showIcon />
         )}
 
         <Table
@@ -215,13 +195,9 @@ class SecretListPage extends React.Component {
             <div>
               <span style={{fontWeight: 600}}>Secrets</span>
               &nbsp;&nbsp;&nbsp;&nbsp;
-              <Button icon={<ReloadOutlined />} onClick={() => this.fetchSecrets()} loading={loading} size="small">
-                Refresh
-              </Button>
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchSecrets()} loading={loading} size="small">Refresh</Button>
               &nbsp;&nbsp;
-              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
-                Add
-              </Button>
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>Add</Button>
             </div>
           )}
         />
@@ -233,39 +209,18 @@ class SecretListPage extends React.Component {
           onCancel={() => this.closeModal()}
           confirmLoading={submitting}
           okText={modalMode === "add" ? "Create" : "Update"}
-          width={600}
+          width={680}
           destroyOnHidden
         >
           <Form ref={this.formRef} layout="vertical">
-            <Form.Item
-              label="Namespace"
-              name="namespace"
-              rules={[{required: true, message: "Namespace is required"}]}
-            >
-              <Select
-                disabled={modalMode === "edit"}
-                options={nsOptions}
-                placeholder="Select a namespace"
-                showSearch
-              />
+            <Form.Item label="Namespace" name="namespace" rules={[{required: true, message: "Namespace is required"}]}>
+              <Select disabled={modalMode === "edit"} options={nsOptions} placeholder="Select a namespace" showSearch />
             </Form.Item>
-            <Form.Item
-              label="Name"
-              name="name"
-              rules={[{required: true, message: "Name is required"}]}
-            >
+            <Form.Item label="Name" name="name" rules={[{required: true, message: "Name is required"}]}>
               <Input disabled={modalMode === "edit"} placeholder="my-secret" />
             </Form.Item>
-            <Form.Item
-              label="Type"
-              name="type"
-              rules={[{required: true, message: "Type is required"}]}
-            >
-              <Select
-                disabled={modalMode === "edit"}
-                options={SECRET_TYPES}
-                placeholder="Select secret type"
-              />
+            <Form.Item label="Type" name="type" rules={[{required: true, message: "Type is required"}]}>
+              <Select disabled={modalMode === "edit"} options={SECRET_TYPES} placeholder="Select secret type" />
             </Form.Item>
 
             <Form.List name="dataEntries">
@@ -273,24 +228,30 @@ class SecretListPage extends React.Component {
                 <>
                   <div style={{marginBottom: 8, fontWeight: 500}}>Data (key-value pairs)</div>
                   {fields.map(({key, name, ...rest}) => (
-                    <Space key={key} align="baseline" style={{display: "flex", marginBottom: 4}}>
+                    <div key={key} style={{display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start"}}>
                       <Form.Item
                         {...rest}
                         name={[name, "key"]}
                         rules={[{required: true, message: "Key required"}]}
-                        style={{marginBottom: 0}}
+                        style={{marginBottom: 0, flex: "0 0 160px"}}
                       >
-                        <Input placeholder="key" style={{width: 180}} />
+                        <Input placeholder="key" />
                       </Form.Item>
                       <Form.Item
                         {...rest}
                         name={[name, "value"]}
-                        style={{marginBottom: 0}}
+                        style={{marginBottom: 0, flex: 1}}
                       >
-                        <Input.Password placeholder="value" style={{width: 240}} />
+                        <Input.Password
+                          placeholder="value"
+                          style={{fontFamily: "monospace", fontSize: 12}}
+                        />
                       </Form.Item>
-                      <MinusCircleOutlined onClick={() => remove(name)} style={{color: "#ff4d4f", cursor: "pointer"}} />
-                    </Space>
+                      <MinusCircleOutlined
+                        onClick={() => remove(name)}
+                        style={{color: "#ff4d4f", cursor: "pointer", marginTop: 8}}
+                      />
+                    </div>
                   ))}
                   <Button
                     type="dashed"
@@ -306,6 +267,14 @@ class SecretListPage extends React.Component {
             </Form.List>
           </Form>
         </Modal>
+
+        <RestartDeploymentsModal
+          open={restartTarget !== null}
+          onClose={() => this.setState({restartTarget: null})}
+          namespace={restartTarget?.namespace ?? ""}
+          configType="secret"
+          configName={restartTarget?.name ?? ""}
+        />
       </div>
     );
   }

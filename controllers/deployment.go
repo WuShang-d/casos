@@ -264,3 +264,29 @@ func (c *ApiController) DeleteDeployment() {
 
 	c.ResponseOk()
 }
+
+// RestartDeployment triggers a rolling restart by patching the pod template annotation.
+// @router /api/restart-deployment [post]
+func (c *ApiController) RestartDeployment() {
+	cfg := getAdminRestConfig()
+	if cfg == nil {
+		c.ResponseError("apiserver not ready")
+		return
+	}
+	var req struct {
+		Namespace string `json:"namespace"`
+		Name      string `json:"name"`
+	}
+	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
+		c.ResponseError("invalid request body: " + err.Error())
+		return
+	}
+	if req.Namespace == "" {
+		req.Namespace = "default"
+	}
+	if err := object.RestartDeployment(cfg, req.Namespace, req.Name); err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	c.ResponseOk()
+}

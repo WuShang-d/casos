@@ -32,6 +32,18 @@ export function updateDeployment(deployment) {
   }).then(res => res.json());
 }
 
+export function restartDeployment(namespace, name) {
+  return fetch(`${Setting.ServerUrl}/api/restart-deployment`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept-Language": Setting.getAcceptLanguage(),
+    },
+    body: JSON.stringify({namespace, name}),
+  }).then(res => res.json());
+}
+
 export function deleteDeployment(namespace, name) {
   return fetch(`${Setting.ServerUrl}/api/delete-deployment`, {
     method: "POST",

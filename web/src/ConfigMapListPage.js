@@ -1,11 +1,12 @@
 import React from "react";
 import {
-  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table
+  Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag
 } from "antd";
 import {DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined} from "@ant-design/icons";
 import * as ConfigMapBackend from "./backend/ConfigMapBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as Setting from "./Setting";
+import RestartDeploymentsModal from "./RestartDeploymentsModal";
 
 class ConfigMapListPage extends React.Component {
   constructor(props) {
@@ -19,6 +20,7 @@ class ConfigMapListPage extends React.Component {
       modalMode: "add",
       submitting: false,
       editingCm: null,
+      restartTarget: null,
     };
     this.formRef = React.createRef();
   }
@@ -30,9 +32,7 @@ class ConfigMapListPage extends React.Component {
 
   fetchNamespaces() {
     NamespaceBackend.getNamespaces().then(res => {
-      if (res.status === "ok") {
-        this.setState({namespaces: res.data ?? []});
-      }
+      if (res.status === "ok") {this.setState({namespaces: res.data ?? []});}
     }).catch(() => {});
   }
 
@@ -66,11 +66,7 @@ class ConfigMapListPage extends React.Component {
     const dataEntries = Object.entries(cm.data ?? {}).map(([key, value]) => ({key, value}));
     this.setState({modalVisible: true, modalMode: "edit", editingCm: cm}, () => {
       setTimeout(() => {
-        this.formRef.current?.setFieldsValue({
-          name: cm.name,
-          namespace: cm.namespace,
-          dataEntries,
-        });
+        this.formRef.current?.setFieldsValue({name: cm.name, namespace: cm.namespace, dataEntries});
       }, 0);
     });
   }
@@ -83,15 +79,9 @@ class ConfigMapListPage extends React.Component {
     this.formRef.current?.validateFields().then(values => {
       const data = {};
       (values.dataEntries ?? []).forEach(({key, value}) => {
-        if (key) {
-          data[key] = value ?? "";
-        }
+        if (key) {data[key] = value ?? "";}
       });
-      const payload = {
-        name: values.name,
-        namespace: values.namespace,
-        data,
-      };
+      const payload = {name: values.name, namespace: values.namespace, data};
 
       this.setState({submitting: true});
 
@@ -108,14 +98,12 @@ class ConfigMapListPage extends React.Component {
           .finally(() => this.setState({submitting: false}));
       } else {
         const cm = this.state.editingCm;
-        ConfigMapBackend.updateConfigMap({
-          ...payload,
-          resourceVersion: cm.resourceVersion,
-        }).then(res => {
+        ConfigMapBackend.updateConfigMap({...payload, resourceVersion: cm.resourceVersion}).then(res => {
           if (res.status === "ok") {
             Setting.showMessage("success", "ConfigMap updated");
             this.closeModal();
             this.fetchConfigMaps();
+            this.setState({restartTarget: {namespace: cm.namespace, name: cm.name}});
           } else {
             Setting.showMessage("error", res.msg);
           }
@@ -137,19 +125,24 @@ class ConfigMapListPage extends React.Component {
   }
 
   render() {
-    const {configmaps, namespaces, loading, error, modalVisible, modalMode, submitting} = this.state;
+    const {configmaps, namespaces, loading, error, modalVisible, modalMode, submitting, restartTarget} = this.state;
 
     const nsOptions = namespaces.map(ns => ({label: ns.name, value: ns.name}));
 
     const columns = [
       {title: "Namespace", dataIndex: "namespace", key: "namespace", width: 160},
-      {title: "Name", dataIndex: "name", key: "name"},
+      {title: "Name", dataIndex: "name", key: "name", width: 200},
       {
-        title: "Data Keys",
-        dataIndex: "dataKeys",
-        key: "dataKeys",
-        width: 110,
-        render: v => v ?? 0,
+        title: "Keys",
+        dataIndex: "data",
+        key: "data",
+        render: data => (
+          <Space size={4} wrap>
+            {Object.keys(data ?? {}).map(k => (
+              <Tag key={k} style={{fontFamily: "monospace", fontSize: 11}}>{k}</Tag>
+            ))}
+          </Space>
+        ),
       },
       {title: "Created", dataIndex: "createdAt", key: "createdAt", width: 180},
       {
@@ -158,18 +151,10 @@ class ConfigMapListPage extends React.Component {
         width: 140,
         render: (_, record) => (
           <Space>
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => this.openEditModal(record)}
-            >
-              Edit
-            </Button>
+            <Button size="small" icon={<EditOutlined />} onClick={() => this.openEditModal(record)}>Edit</Button>
             <Popconfirm
               title={`Delete ConfigMap "${record.name}"?`}
-              okText="Delete"
-              okType="danger"
-              cancelText="Cancel"
+              okText="Delete" okType="danger" cancelText="Cancel"
               onConfirm={() => this.handleDelete(record)}
             >
               <Button size="small" danger icon={<DeleteOutlined />}>Delete</Button>
@@ -182,13 +167,7 @@ class ConfigMapListPage extends React.Component {
     return (
       <div style={{padding: "24px"}}>
         {error && (
-          <Alert
-            type="error"
-            message="Failed to fetch ConfigMaps"
-            description={error}
-            style={{marginBottom: 16}}
-            showIcon
-          />
+          <Alert type="error" message="Failed to fetch ConfigMaps" description={error} style={{marginBottom: 16}} showIcon />
         )}
 
         <Table
@@ -203,45 +182,28 @@ class ConfigMapListPage extends React.Component {
             <div>
               <span style={{fontWeight: 600}}>ConfigMaps</span>
               &nbsp;&nbsp;&nbsp;&nbsp;
-              <Button icon={<ReloadOutlined />} onClick={() => this.fetchConfigMaps()} loading={loading} size="small">
-                Refresh
-              </Button>
+              <Button icon={<ReloadOutlined />} onClick={() => this.fetchConfigMaps()} loading={loading} size="small">Refresh</Button>
               &nbsp;&nbsp;
-              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>
-                Add
-              </Button>
+              <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>Add</Button>
             </div>
           )}
         />
 
         <Modal
-          title={modalMode === "add" ? "Add Config Map" : "Edit Config Map"}
+          title={modalMode === "add" ? "Add ConfigMap" : "Edit ConfigMap"}
           open={modalVisible}
           onOk={() => this.handleSubmit()}
           onCancel={() => this.closeModal()}
           confirmLoading={submitting}
           okText={modalMode === "add" ? "Create" : "Update"}
-          width={600}
+          width={680}
           destroyOnHidden
         >
           <Form ref={this.formRef} layout="vertical">
-            <Form.Item
-              label="Namespace"
-              name="namespace"
-              rules={[{required: true, message: "Namespace is required"}]}
-            >
-              <Select
-                disabled={modalMode === "edit"}
-                options={nsOptions}
-                placeholder="Select a namespace"
-                showSearch
-              />
+            <Form.Item label="Namespace" name="namespace" rules={[{required: true, message: "Namespace is required"}]}>
+              <Select disabled={modalMode === "edit"} options={nsOptions} placeholder="Select a namespace" showSearch />
             </Form.Item>
-            <Form.Item
-              label="Name"
-              name="name"
-              rules={[{required: true, message: "Name is required"}]}
-            >
+            <Form.Item label="Name" name="name" rules={[{required: true, message: "Name is required"}]}>
               <Input disabled={modalMode === "edit"} placeholder="my-configmap" />
             </Form.Item>
 
@@ -250,24 +212,31 @@ class ConfigMapListPage extends React.Component {
                 <>
                   <div style={{marginBottom: 8, fontWeight: 500}}>Data (key-value pairs)</div>
                   {fields.map(({key, name, ...rest}) => (
-                    <Space key={key} align="baseline" style={{display: "flex", marginBottom: 4}}>
+                    <div key={key} style={{display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start"}}>
                       <Form.Item
                         {...rest}
                         name={[name, "key"]}
                         rules={[{required: true, message: "Key required"}]}
-                        style={{marginBottom: 0}}
+                        style={{marginBottom: 0, flex: "0 0 160px"}}
                       >
-                        <Input placeholder="key" style={{width: 180}} />
+                        <Input placeholder="key" />
                       </Form.Item>
                       <Form.Item
                         {...rest}
                         name={[name, "value"]}
-                        style={{marginBottom: 0}}
+                        style={{marginBottom: 0, flex: 1}}
                       >
-                        <Input placeholder="value" style={{width: 240}} />
+                        <Input.TextArea
+                          placeholder="value"
+                          autoSize={{minRows: 1, maxRows: 8}}
+                          style={{fontFamily: "monospace", fontSize: 12}}
+                        />
                       </Form.Item>
-                      <MinusCircleOutlined onClick={() => remove(name)} style={{color: "#ff4d4f", cursor: "pointer"}} />
-                    </Space>
+                      <MinusCircleOutlined
+                        onClick={() => remove(name)}
+                        style={{color: "#ff4d4f", cursor: "pointer", marginTop: 8}}
+                      />
+                    </div>
                   ))}
                   <Button
                     type="dashed"
@@ -283,6 +252,14 @@ class ConfigMapListPage extends React.Component {
             </Form.List>
           </Form>
         </Modal>
+
+        <RestartDeploymentsModal
+          open={restartTarget !== null}
+          onClose={() => this.setState({restartTarget: null})}
+          namespace={restartTarget?.namespace ?? ""}
+          configType="configmap"
+          configName={restartTarget?.name ?? ""}
+        />
       </div>
     );
   }
