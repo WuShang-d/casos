@@ -98,6 +98,12 @@ func InitAPI() {
 	beego.Router("/api/deploy-app", &controllers.ApiController{}, "POST:DeployApp")
 	beego.Router("/api/get-app-templates", &controllers.ApiController{}, "GET:GetAppTemplates")
 
+	beego.Router("/api/get-cronjobs", &controllers.ApiController{}, "GET:GetCronJobs")
+	beego.Router("/api/get-cronjob", &controllers.ApiController{}, "GET:GetCronJob")
+	beego.Router("/api/add-cronjob", &controllers.ApiController{}, "POST:AddCronJob")
+	beego.Router("/api/update-cronjob", &controllers.ApiController{}, "POST:UpdateCronJob")
+	beego.Router("/api/delete-cronjob", &controllers.ApiController{}, "POST:DeleteCronJob")
+
 	beego.Router("/api/get-trivy-scan-results", &controllers.ApiController{}, "GET:GetTrivyScanResults")
 	beego.Router("/api/trigger-trivy-scan", &controllers.ApiController{}, "POST:TriggerTrivyScan")
 	beego.Router("/api/delete-trivy-scan-result", &controllers.ApiController{}, "POST:DeleteTrivyScanResult")

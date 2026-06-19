@@ -47,6 +47,7 @@
     "OK": "确定",
     "Deployments": "部署",
     "Stateful Sets": "有状态副本集",
+    "Cron Jobs": "定时任务",
     "Ingresses": "入口",
     "Pods": "容器组",
     "Save": "保存",

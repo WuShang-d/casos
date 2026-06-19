@@ -34,6 +34,7 @@ import ClusterRoleBindingListPage from "./ClusterRoleBindingListPage";
 import PvcListPage from "./PvcListPage";
 import IngressListPage from "./IngressListPage";
 import StatefulSetListPage from "./StatefulSetListPage";
+import CronJobListPage from "./CronJobListPage";
 import DashboardPage from "./DashboardPage";
 import SiteListPage from "./SiteListPage";
 import SiteEditPage from "./SiteEditPage";
@@ -48,7 +49,7 @@ const {Header, Footer, Content, Sider} = Layout;
 function getMenuParentKey(uri) {
   if (!uri) {return null;}
   if (uri === "/dashboard" || uri === "/app-store") {return null;}
-  if (uri.includes("/pods") || uri.includes("/deployments") || uri.includes("/statefulsets")) {return "/workloads";}
+  if (uri.includes("/pods") || uri.includes("/deployments") || uri.includes("/statefulsets") || uri.includes("/cronjobs")) {return "/workloads";}
   if (uri.includes("/nodes") || uri.includes("/namespaces") || uri.includes("/serviceaccounts")) {return "/cluster";}
   if (uri.includes("/configmaps") || uri.includes("/secrets") || uri.includes("/pvcs")) {return "/configuration";}
   if (uri.includes("/ingresses")) {return "/networking";}
@@ -195,6 +196,7 @@ function ManagementPage(props) {
         Setting.getItem(<Link to="/deployments">{i18next.t("general:Deployments")}</Link>, "/deployments"),
         Setting.getItem(<Link to="/statefulsets">{i18next.t("general:Stateful Sets")}</Link>, "/statefulsets"),
         Setting.getItem(<Link to="/pods">{i18next.t("general:Pods")}</Link>, "/pods"),
+        Setting.getItem(<Link to="/cronjobs">{i18next.t("general:Cron Jobs")}</Link>, "/cronjobs"),
       ]),
       Setting.getItem(<Link to="/nodes">{i18next.t("general:Cluster")}</Link>, "/cluster", <ClusterOutlined />, [
         Setting.getItem(<Link to="/nodes">{i18next.t("general:Nodes")}</Link>, "/nodes"),
@@ -232,6 +234,7 @@ function ManagementPage(props) {
         <Route exact path="/deployments" render={(props) => <DeploymentListPage {...props} />} />
         <Route exact path="/statefulsets" render={(props) => <StatefulSetListPage {...props} />} />
         <Route exact path="/pods" render={(props) => <PodListPage {...props} />} />
+        <Route exact path="/cronjobs" render={(props) => <CronJobListPage {...props} />} />
         <Route exact path="/nodes" render={(props) => <NodeListPage {...props} />} />
         <Route exact path="/namespaces" render={(props) => <NamespaceListPage {...props} />} />
         <Route exact path="/serviceaccounts" render={(props) => <ServiceAccountListPage {...props} />} />
