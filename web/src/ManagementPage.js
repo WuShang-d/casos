@@ -32,6 +32,7 @@ import NodeListPage from "./NodeListPage";
 import ServiceAccountListPage from "./ServiceAccountListPage";
 import ServiceListPage from "./ServiceListPage";
 import ClusterRoleBindingListPage from "./ClusterRoleBindingListPage";
+import RoleBindingListPage from "./RoleBindingListPage";
 import PvcListPage from "./PvcListPage";
 import IngressListPage from "./IngressListPage";
 import StatefulSetListPage from "./StatefulSetListPage";
@@ -59,7 +60,7 @@ function getMenuParentKey(uri) {
   if (uri.includes("/configmaps") || uri.includes("/secrets") || uri.includes("/pvcs") || uri.includes("/resourcequotas")) {return "/configuration";}
   if (uri.includes("/ingresses") || uri.includes("/networkpolicies")) {return "/networking";}
   if (uri.includes("/services")) {return "/networking";}
-  if (uri.includes("/clusterrolebindings")) {return "/accesscontrol";}
+  if (uri.includes("/clusterrolebindings") || uri.includes("/rolebindings")) {return "/accesscontrol";}
   if (uri.includes("/admission-policy") || uri.includes("/authorization-policy") || uri.includes("/trivy-scans")) {return "/accesscontrol";}
   if (uri.includes("/sites")) {return "/admin";}
   return null;
@@ -222,6 +223,7 @@ function ManagementPage(props) {
         Setting.getItem(<Link to="/networkpolicies">{i18next.t("general:Network Policies")}</Link>, "/networkpolicies"),
       ]),
       Setting.getItem(<Link to="/clusterrolebindings">{i18next.t("general:Access Control")}</Link>, "/accesscontrol", <LockOutlined />, [
+        Setting.getItem(<Link to="/rolebindings">{i18next.t("general:Role Bindings")}</Link>, "/rolebindings"),
         Setting.getItem(<Link to="/clusterrolebindings">{i18next.t("general:ClusterRoleBindings")}</Link>, "/clusterrolebindings"),
         Setting.getItem(<Link to="/admission-policy">{i18next.t("general:Admission Policy")}</Link>, "/admission-policy"),
         Setting.getItem(<Link to="/authorization-policy">{i18next.t("general:Authorization Policy")}</Link>, "/authorization-policy"),
@@ -257,6 +259,7 @@ function ManagementPage(props) {
         <Route exact path="/ingresses" render={(props) => <IngressListPage {...props} />} />
         <Route exact path="/networkpolicies" render={(props) => <NetworkPolicyListPage {...props} />} />
         <Route exact path="/clusterrolebindings" render={(props) => <ClusterRoleBindingListPage {...props} />} />
+        <Route exact path="/rolebindings" render={(props) => <RoleBindingListPage {...props} />} />
         <Route exact path="/admission-policy" render={(props) => <AdmissionPolicyPage {...props} />} />
         <Route exact path="/authorization-policy" render={(props) => <AuthorizationPolicyPage {...props} />} />
         <Route exact path="/trivy-scans" render={(props) => <TrivyScanPage {...props} />} />

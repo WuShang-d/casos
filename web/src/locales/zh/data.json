@@ -60,6 +60,7 @@
     "OK": "确定",
     "Persistent Volume Claims": "存储卷",
     "Resource Quotas": "资源配额",
+    "Role Bindings": "角色绑定",
     "Pods": "容器组",
     "Save": "保存",
     "Secrets": "密钥",

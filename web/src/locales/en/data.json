@@ -60,6 +60,7 @@
     "OK": "OK",
     "Persistent Volume Claims": "Persistent Volume Claims",
     "Resource Quotas": "Resource Quotas",
+    "Role Bindings": "Role Bindings",
     "Pods": "Pods",
     "Save": "Save",
     "Secrets": "Secrets",
