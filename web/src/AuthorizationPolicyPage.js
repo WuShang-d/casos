@@ -1,24 +1,16 @@
 import React from "react";
-import {Typography} from "antd";
+import {useTranslation} from "react-i18next";
+import i18next from "i18next";
 import CasbinRuleListPage from "./CasbinRuleListPage";
 
-const {Text} = Typography;
-
-const description = (
-  <>
-    <strong>Authorization Webhook</strong> — intercepts every API request (get / list / watch / create …) after Node and RBAC authorizers, before the request reaches the handler.
-    {" "}<strong>p</strong> = policy (subject, namespace, resource, verb, effect) · <strong>g</strong> = role assignment · <Text code style={{fontSize: 11}}>*</Text> = wildcard.
-    {" "}A default <Text code style={{fontSize: 11}}>allow *</Text> rule is seeded on first run. system:* users bypass this webhook entirely.
-  </>
-);
-
 export default function AuthorizationPolicyPage(props) {
+  useTranslation();
   return (
     <CasbinRuleListPage
       {...props}
       scope="authorization"
-      title="Authorization Policy"
-      description={description}
+      title={i18next.t("general:Authorization Policy")}
+      description={i18next.t("policy:authorization desc")}
     />
   );
 }

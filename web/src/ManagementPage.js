@@ -211,8 +211,8 @@ function ManagementPage(props) {
       ]),
       Setting.getItem(<Link to="/clusterrolebindings">{i18next.t("general:Access Control")}</Link>, "/accesscontrol", <LockOutlined />, [
         Setting.getItem(<Link to="/clusterrolebindings">{i18next.t("general:ClusterRoleBindings")}</Link>, "/clusterrolebindings"),
-        Setting.getItem(<Link to="/admission-policy">Admission Policy</Link>, "/admission-policy"),
-        Setting.getItem(<Link to="/authorization-policy">Authorization Policy</Link>, "/authorization-policy"),
+        Setting.getItem(<Link to="/admission-policy">{i18next.t("general:Admission Policy")}</Link>, "/admission-policy"),
+        Setting.getItem(<Link to="/authorization-policy">{i18next.t("general:Authorization Policy")}</Link>, "/authorization-policy"),
       ]),
       Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Admin")}</Link>, "/admin", <LayoutOutlined />, [
         Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Sites")}</Link>, "/sites"),

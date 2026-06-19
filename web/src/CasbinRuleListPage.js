@@ -1,6 +1,8 @@
 import React from "react";
 import {Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography} from "antd";
 import {DeleteOutlined, PlusOutlined, ReloadOutlined, SafetyCertificateOutlined} from "@ant-design/icons";
+import {useTranslation} from "react-i18next";
+import i18next from "i18next";
 import * as CasbinRuleBackend from "./backend/CasbinRuleBackend";
 import * as Setting from "./Setting";
 
@@ -14,21 +16,16 @@ const RESOURCES = ["*", "pods", "deployments", "statefulsets", "services", "ingr
 const ADMISSION_ACTIONS = ["*", "CREATE", "UPDATE", "DELETE", "CONNECT"];
 const AUTHORIZATION_VERBS = ["*", "get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"];
 
-const PTYPES = [
-  {value: "p", label: "p — policy"},
-  {value: "g", label: "g — role assignment"},
-];
-
 function ruleTag(pType) {
   return pType === "g"
-    ? <Tag color="blue">role</Tag>
-    : <Tag color="green">policy</Tag>;
+    ? <Tag color="blue">{i18next.t("policy:g role")}</Tag>
+    : <Tag color="green">{i18next.t("policy:p policy")}</Tag>;
 }
 
 function eftTag(v4) {
   return v4 === "deny"
-    ? <Tag color="red">deny</Tag>
-    : <Tag color="green">allow</Tag>;
+    ? <Tag color="red">{i18next.t("policy:deny")}</Tag>
+    : <Tag color="green">{i18next.t("policy:allow")}</Tag>;
 }
 
 class CasbinRuleListPage extends React.Component {
@@ -86,7 +83,7 @@ class CasbinRuleListPage extends React.Component {
     CasbinRuleBackend.addCasbinRule(rule)
       .then(res => {
         if (res.status === "ok") {
-          Setting.showMessage("success", "Rule added");
+          Setting.showMessage("success", i18next.t("policy:Rule added"));
           this.setState({modalVisible: false, submitting: false});
           this.formRef.current?.resetFields();
           this.loadRules();
@@ -106,7 +103,7 @@ class CasbinRuleListPage extends React.Component {
     CasbinRuleBackend.deleteCasbinRule(id, scope)
       .then(res => {
         if (res.status === "ok") {
-          Setting.showMessage("success", "Rule deleted");
+          Setting.showMessage("success", i18next.t("policy:Rule deleted"));
           this.loadRules();
         } else {
           Setting.showMessage("error", res.msg);
@@ -119,7 +116,7 @@ class CasbinRuleListPage extends React.Component {
     CasbinRuleBackend.reloadCasbinEnforcer(scope)
       .then(res => {
         if (res.status === "ok") {
-          Setting.showMessage("success", "Enforcer reloaded");
+          Setting.showMessage("success", i18next.t("policy:Enforcer reloaded"));
         } else {
           Setting.showMessage("error", res.msg);
         }
@@ -128,10 +125,13 @@ class CasbinRuleListPage extends React.Component {
 
   renderAddModal() {
     const {modalVisible, submitting} = this.state;
-    const actionOptions = this.props.scope === "authorization" ? AUTHORIZATION_VERBS : ADMISSION_ACTIONS;
+    const {scope} = this.props;
+    const actionOptions = scope === "authorization" ? AUTHORIZATION_VERBS : ADMISSION_ACTIONS;
+    const actionLabel = scope === "authorization" ? i18next.t("policy:Verb") : i18next.t("policy:Action");
+
     return (
       <Modal
-        title="Add Rule"
+        title={i18next.t("policy:Add Rule")}
         open={modalVisible}
         onCancel={() => {
           this.setState({modalVisible: false});
@@ -141,10 +141,12 @@ class CasbinRuleListPage extends React.Component {
         confirmLoading={submitting}
         destroyOnClose
       >
-        <Form ref={this.formRef} layout="vertical" onFinish={(v) => this.handleAdd(v)} initialValues={{pType: "p", v1: "*", v2: "*", v3: "*", v4: "allow"}}>
-          <Form.Item name="pType" label="Type" rules={[{required: true}]}>
+        <Form ref={this.formRef} layout="vertical" onFinish={(v) => this.handleAdd(v)}
+          initialValues={{pType: "p", v1: "*", v2: "*", v3: "*", v4: "allow"}}>
+          <Form.Item name="pType" label={i18next.t("policy:Type")} rules={[{required: true}]}>
             <Select>
-              {PTYPES.map(pt => <Option key={pt.value} value={pt.value}>{pt.label}</Option>)}
+              <Option value="p">{i18next.t("policy:p policy")}</Option>
+              <Option value="g">{i18next.t("policy:g role")}</Option>
             </Select>
           </Form.Item>
           <Form.Item noStyle shouldUpdate={(prev, cur) => prev.pType !== cur.pType}>
@@ -152,34 +154,38 @@ class CasbinRuleListPage extends React.Component {
               const isPolicy = getFieldValue("pType") === "p";
               return (
                 <>
-                  <Form.Item name="v0" label={isPolicy ? "Subject (user or role)" : "User / Group"} rules={[{required: true, message: "required"}]}>
-                    <Input placeholder={isPolicy ? "e.g. alice or role:admin" : "e.g. alice"} />
+                  <Form.Item
+                    name="v0"
+                    label={isPolicy ? i18next.t("policy:Subject") : i18next.t("policy:User Group")}
+                    rules={[{required: true, message: i18next.t("policy:required")}]}
+                  >
+                    <Input placeholder={isPolicy ? i18next.t("policy:subject placeholder") : i18next.t("policy:user placeholder")} />
                   </Form.Item>
                   {isPolicy ? (
                     <>
-                      <Form.Item name="v1" label="Namespace">
-                        <Input placeholder="* for all namespaces" />
+                      <Form.Item name="v1" label={i18next.t("policy:Namespace")}>
+                        <Input placeholder={i18next.t("policy:namespace placeholder")} />
                       </Form.Item>
-                      <Form.Item name="v2" label="Resource">
-                        <Select showSearch allowClear placeholder="* for all resources">
+                      <Form.Item name="v2" label={i18next.t("policy:Resource")}>
+                        <Select showSearch allowClear placeholder={i18next.t("policy:resource placeholder")}>
                           {RESOURCES.map(r => <Option key={r} value={r}>{r}</Option>)}
                         </Select>
                       </Form.Item>
-                      <Form.Item name="v3" label={this.props.scope === "authorization" ? "Verb" : "Action"}>
-                        <Select placeholder="* for all">
+                      <Form.Item name="v3" label={actionLabel}>
+                        <Select placeholder={i18next.t("policy:action placeholder")}>
                           {actionOptions.map(a => <Option key={a} value={a}>{a}</Option>)}
                         </Select>
                       </Form.Item>
-                      <Form.Item name="v4" label="Effect" rules={[{required: true}]}>
+                      <Form.Item name="v4" label={i18next.t("policy:Effect")} rules={[{required: true}]}>
                         <Select>
-                          <Option value="allow">allow</Option>
-                          <Option value="deny">deny</Option>
+                          <Option value="allow">{i18next.t("policy:allow")}</Option>
+                          <Option value="deny">{i18next.t("policy:deny")}</Option>
                         </Select>
                       </Form.Item>
                     </>
                   ) : (
-                    <Form.Item name="v1" label="Role" rules={[{required: true, message: "required"}]}>
-                      <Input placeholder="e.g. role:admin" />
+                    <Form.Item name="v1" label={i18next.t("policy:Role")} rules={[{required: true, message: i18next.t("policy:required")}]}>
+                      <Input placeholder={i18next.t("policy:role placeholder")} />
                     </Form.Item>
                   )}
                 </>
@@ -194,22 +200,22 @@ class CasbinRuleListPage extends React.Component {
   render() {
     const {rules, loading} = this.state;
     const {title, description, scope} = this.props;
-    const actionLabel = scope === "authorization" ? "Verb" : "Action";
+    const actionLabel = scope === "authorization" ? i18next.t("policy:Verb") : i18next.t("policy:Action");
 
     const columns = [
-      {title: "Type", dataIndex: "pType", width: 90, render: (v) => ruleTag(v)},
-      {title: "Subject / User", dataIndex: "v0", render: (v) => <Text code>{v}</Text>},
-      {title: "Namespace / Role", dataIndex: "v1", render: (v) => v ? <Text code>{v}</Text> : <Text type="secondary">—</Text>},
-      {title: "Resource", dataIndex: "v2", render: (v) => v ? <Text code>{v}</Text> : <Text type="secondary">—</Text>},
+      {title: i18next.t("policy:Type"), dataIndex: "pType", width: 90, render: (v) => ruleTag(v)},
+      {title: i18next.t("policy:Subject column"), dataIndex: "v0", render: (v) => <Text code>{v}</Text>},
+      {title: i18next.t("policy:Namespace column"), dataIndex: "v1", render: (v) => v ? <Text code>{v}</Text> : <Text type="secondary">—</Text>},
+      {title: i18next.t("policy:Resource"), dataIndex: "v2", render: (v) => v ? <Text code>{v}</Text> : <Text type="secondary">—</Text>},
       {title: actionLabel, dataIndex: "v3", render: (v) => v ? <Tag>{v}</Tag> : <Text type="secondary">—</Text>},
-      {title: "Effect", dataIndex: "v4", width: 80, render: (v, record) => record.pType === "p" ? eftTag(v) : <Text type="secondary">—</Text>},
+      {title: i18next.t("policy:Effect"), dataIndex: "v4", width: 80, render: (v, record) => record.pType === "p" ? eftTag(v) : <Text type="secondary">—</Text>},
       {
-        title: "Op",
+        title: i18next.t("policy:Op column"),
         key: "actions",
         width: 60,
         align: "center",
         render: (_, record) => (
-          <Popconfirm title="Delete this rule?" onConfirm={() => this.handleDelete(record.id)}>
+          <Popconfirm title={i18next.t("policy:Delete this rule?")} onConfirm={() => this.handleDelete(record.id)}>
             <Button type="text" danger icon={<DeleteOutlined />} size="small" />
           </Popconfirm>
         ),
@@ -223,11 +229,13 @@ class CasbinRuleListPage extends React.Component {
           <span style={{fontSize: 16, fontWeight: 600}}>{title}</span>
           <div style={{flex: 1}} />
           <Space>
-            <Tooltip title="Reload enforcer from DB (auto-reloads on every mutation)">
-              <Button icon={<ReloadOutlined />} onClick={() => this.handleReload()}>Reload Enforcer</Button>
+            <Tooltip title={i18next.t("policy:Reload Enforcer tooltip")}>
+              <Button icon={<ReloadOutlined />} onClick={() => this.handleReload()}>
+                {i18next.t("policy:Reload Enforcer")}
+              </Button>
             </Tooltip>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => this.setState({modalVisible: true})}>
-              Add Rule
+              {i18next.t("policy:Add Rule")}
             </Button>
           </Space>
         </div>
@@ -253,4 +261,8 @@ class CasbinRuleListPage extends React.Component {
   }
 }
 
-export default CasbinRuleListPage;
+// Wrapper so the class component re-renders on language change
+export default function CasbinRuleListPageWrapper(props) {
+  useTranslation();
+  return <CasbinRuleListPage {...props} />;
+}
