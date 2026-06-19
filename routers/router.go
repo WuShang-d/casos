@@ -59,6 +59,7 @@ func InitAPI() {
 	beego.Router("/api/delete-clusterrolebinding", &controllers.ApiController{}, "POST:DeleteClusterRoleBinding")
 
 	beego.Router("/api/get-dashboard", &controllers.ApiController{}, "GET:GetDashboard")
+	beego.Router("/api/get-metrics", &controllers.ApiController{}, "GET:GetMetrics")
 
 	beego.Router("/api/get-global-sites", &controllers.ApiController{}, "GET:GetGlobalSites")
 	beego.Router("/api/get-sites", &controllers.ApiController{}, "GET:GetSites")

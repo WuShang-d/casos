@@ -79,8 +79,10 @@ require (
 )
 
 require (
+	github.com/casbin/casbin/v2 v2.135.0
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/net v0.53.0
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v1.36.1-k3s1
 	k8s.io/component-base v1.36.1-k3s1
 )
@@ -100,7 +102,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
-	github.com/casbin/casbin/v2 v2.135.0 // indirect
 	github.com/casbin/govaluate v1.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -264,7 +265,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.0.0 // indirect
 	k8s.io/apiserver v1.36.1-k3s1 // indirect
 	k8s.io/cloud-provider v0.0.0 // indirect

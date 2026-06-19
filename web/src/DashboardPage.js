@@ -76,6 +76,11 @@ const EchartsWidget = React.memo(({option, style}) => {
 
 EchartsWidget.displayName = "EchartsWidget";
 
+function formatMiB(mib) {
+  if (mib >= 1024) {return `${(mib / 1024).toFixed(1)} GiB`;}
+  return `${mib} MiB`;
+}
+
 function buildPodPhaseOption(podsByPhase) {
   if (!podsByPhase) {return null;}
   const data = Object.entries(podsByPhase).map(([name, value]) => ({
@@ -417,6 +422,42 @@ function DashboardPage() {
           </Card>
         </Col>
       </Row>
+
+      {/* Row 1b — Cluster CPU / Memory usage (shown only when metrics-server is available) */}
+      {(stats.clusterCPUTotalM > 0 || stats.clusterMemTotalMi > 0) && (
+        <Row gutter={gutter} style={{marginTop: 16}}>
+          <Col xs={24} md={12}>
+            <Card variant="borderless" style={cardStyle}>
+              <div style={{marginBottom: 6, fontWeight: 500, color: "#595959"}}>CPU</div>
+              <div style={{display: "flex", alignItems: "center", gap: 12}}>
+                <Progress
+                  percent={stats.clusterCPUTotalM > 0 ? Math.round(stats.clusterCPUUsedM / stats.clusterCPUTotalM * 100) : 0}
+                  strokeColor={{"0%": "#0958d9", "100%": "#1677ff"}}
+                  style={{flex: 1}}
+                />
+                <span style={{fontSize: 13, color: "#595959", whiteSpace: "nowrap"}}>
+                  {(stats.clusterCPUUsedM / 1000).toFixed(2)} / {(stats.clusterCPUTotalM / 1000).toFixed(2)} cores
+                </span>
+              </div>
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card variant="borderless" style={cardStyle}>
+              <div style={{marginBottom: 6, fontWeight: 500, color: "#595959"}}>Memory</div>
+              <div style={{display: "flex", alignItems: "center", gap: 12}}>
+                <Progress
+                  percent={stats.clusterMemTotalMi > 0 ? Math.round(stats.clusterMemUsedMi / stats.clusterMemTotalMi * 100) : 0}
+                  strokeColor={{"0%": "#06b6d4", "100%": "#14b8a6"}}
+                  style={{flex: 1}}
+                />
+                <span style={{fontSize: 13, color: "#595959", whiteSpace: "nowrap"}}>
+                  {formatMiB(stats.clusterMemUsedMi)} / {formatMiB(stats.clusterMemTotalMi)}
+                </span>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       {/* Row 2 — Pods by namespace (bar) + Pod phase (donut) */}
       <Row gutter={gutter} style={{marginTop: 16}}>

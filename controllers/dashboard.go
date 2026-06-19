@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"path/filepath"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/casosorg/casos/object"
@@ -30,6 +32,11 @@ type dashboardStats struct {
 	DeploymentsTotal     int            `json:"deploymentsTotal"`
 	DeploymentsAvailable int            `json:"deploymentsAvailable"`
 	UnhealthyPods        []unhealthyPod `json:"unhealthyPods"`
+	// Resource usage (from metrics-server; zero when metrics-server is absent)
+	ClusterCPUUsedM   int64 `json:"clusterCPUUsedM"`
+	ClusterCPUTotalM  int64 `json:"clusterCPUTotalM"`
+	ClusterMemUsedMi  int64 `json:"clusterMemUsedMi"`
+	ClusterMemTotalMi int64 `json:"clusterMemTotalMi"`
 }
 
 // GetDashboard returns aggregated cluster statistics.
@@ -175,6 +182,20 @@ func (c *ApiController) GetDashboard() {
 
 	if sas, err := object.GetServiceAccounts(cfg, ""); err == nil {
 		stats.ServiceAccounts = len(sas)
+	}
+
+	// Cluster resource usage — best-effort, ignored if kubelet is unreachable
+	certDir := ""
+	if sc := getServerConfig(); sc != nil {
+		certDir = filepath.Join(sc.DataDir, "tls")
+	}
+	if clusterMetrics, err := object.GetClusterMetrics(cfg, certDir); err == nil {
+		for _, nm := range clusterMetrics.Nodes {
+			stats.ClusterCPUUsedM += nm.CPUUsedM
+			stats.ClusterCPUTotalM += nm.CPUTotalM
+			stats.ClusterMemUsedMi += nm.MemUsedMi
+			stats.ClusterMemTotalMi += nm.MemTotalMi
+		}
 	}
 
 	c.ResponseOk(stats)
