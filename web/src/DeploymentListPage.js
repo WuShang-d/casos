@@ -2,7 +2,7 @@ import React from "react";
 import {
   Alert, Button, Divider, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography
 } from "antd";
-import {DeleteOutlined, EditOutlined, HddOutlined, PlusOutlined, ReloadOutlined, ShareAltOutlined, SyncOutlined} from "@ant-design/icons";
+import {DeleteOutlined, EditOutlined, HddOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, ShareAltOutlined, SyncOutlined} from "@ant-design/icons";
 import * as DeploymentBackend from "./backend/DeploymentBackend";
 import * as NamespaceBackend from "./backend/NamespaceBackend";
 import * as ConfigMapBackend from "./backend/ConfigMapBackend";
@@ -10,9 +10,11 @@ import * as SecretBackend from "./backend/SecretBackend";
 import * as ServiceBackend from "./backend/ServiceBackend";
 import * as NodeBackend from "./backend/NodeBackend";
 import * as MetricsBackend from "./backend/MetricsBackend";
+import * as IngressBackend from "./backend/IngressBackend";
 import * as Setting from "./Setting";
 import DeploymentExposeModal from "./DeploymentExposeModal";
 import DeploymentUpdateImageModal from "./DeploymentUpdateImageModal";
+import DeploymentDomainModal from "./DeploymentDomainModal";
 import DeploymentStorageEditor from "./DeploymentStorageEditor";
 import EnvVarEditor, {ENV_SOURCE_CONFIGMAP, ENV_SOURCE_PLAIN, ENV_SOURCE_SECRET} from "./EnvVarEditor";
 import ReplicasControl from "./ReplicasControl";
@@ -54,6 +56,7 @@ class DeploymentListPage extends React.Component {
       configMaps: [],
       secrets: [],
       services: [],
+      ingresses: [],
       nodeIP: null,
       loading: true,
       error: null,
@@ -63,6 +66,7 @@ class DeploymentListPage extends React.Component {
       editingDeploy: null,
       exposeDeploy: null,
       updateImageDeploy: null,
+      domainDeploy: null,
       envVars: [],
       volumes: [],
       podMetrics: [],
@@ -76,6 +80,7 @@ class DeploymentListPage extends React.Component {
     this.fetchServices();
     this.fetchNodeIP();
     this.fetchPodMetrics();
+    this.fetchIngresses();
   }
 
   fetchNamespaces() {
@@ -87,6 +92,12 @@ class DeploymentListPage extends React.Component {
   fetchServices() {
     ServiceBackend.getServices().then(res => {
       if (res.status === "ok") {this.setState({services: res.data ?? []});}
+    }).catch(() => {});
+  }
+
+  fetchIngresses() {
+    IngressBackend.getIngresses().then(res => {
+      if (res.status === "ok") {this.setState({ingresses: res.data ?? []});}
     }).catch(() => {});
   }
 
@@ -139,11 +150,37 @@ class DeploymentListPage extends React.Component {
   }
 
   getAccessUrls(deploy) {
-    const {services, nodeIP} = this.state;
-    if (!nodeIP) {return [];}
-    const svc = services.find(s => s.name === deploy.name && s.namespace === deploy.namespace && s.type === "NodePort");
-    if (!svc) {return [];}
-    return (svc.ports ?? []).filter(p => p.nodePort).map(p => `http://${nodeIP}:${p.nodePort}`);
+    const {services, ingresses, nodeIP} = this.state;
+    const urls = [];
+
+    if (nodeIP) {
+      const svc = services.find(s => s.name === deploy.name && s.namespace === deploy.namespace && s.type === "NodePort");
+      if (svc) {
+        (svc.ports ?? []).filter(p => p.nodePort).forEach(p => {
+          urls.push({url: `http://${nodeIP}:${p.nodePort}`, type: "nodeport"});
+        });
+      }
+    }
+
+    const deployServiceNames = new Set(
+      (services ?? [])
+        .filter(s => s.namespace === deploy.namespace && s.selector?.app === deploy.name)
+        .map(s => s.name)
+    );
+    deployServiceNames.add(deploy.name);
+
+    (ingresses ?? [])
+      .filter(ing => ing.namespace === deploy.namespace)
+      .forEach(ing => {
+        (ing.rules ?? []).forEach(rule => {
+          if (deployServiceNames.has(rule.serviceName) && rule.host) {
+            const path = rule.path && rule.path !== "/" ? rule.path : "";
+            urls.push({url: `http://${rule.host}${path}`, type: "domain"});
+          }
+        });
+      });
+
+    return urls;
   }
 
   openAddModal() {
@@ -233,8 +270,8 @@ class DeploymentListPage extends React.Component {
   }
 
   render() {
-    const {deployments, namespaces, configMaps, secrets, loading, error,
-      modalVisible, modalMode, submitting, exposeDeploy, updateImageDeploy,
+    const {deployments, namespaces, configMaps, secrets, services, loading, error,
+      modalVisible, modalMode, submitting, exposeDeploy, updateImageDeploy, domainDeploy,
       envVars, volumes, podMetrics} = this.state;
 
     const metricsAvailable = podMetrics.length > 0;
@@ -327,8 +364,11 @@ class DeploymentListPage extends React.Component {
         render: (_, record) => {
           const urls = this.getAccessUrls(record);
           if (urls.length === 0) {return null;}
-          return urls.map((url, i) => (
-            <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{display: "block"}}>{url}</a>
+          return urls.map(({url, type}, i) => (
+            <div key={i} style={{display: "flex", alignItems: "center", gap: 4, marginBottom: 2}}>
+              {type === "domain" && <LinkOutlined style={{color: "#1677ff", fontSize: 11}} />}
+              <a href={url} target="_blank" rel="noopener noreferrer" style={{fontSize: 13}}>{url}</a>
+            </div>
           ));
         },
       },
@@ -342,6 +382,7 @@ class DeploymentListPage extends React.Component {
             <Button size="small" icon={<EditOutlined />} onClick={() => this.openEditModal(record)}>Edit</Button>
             <Button size="small" icon={<SyncOutlined />} onClick={() => this.setState({updateImageDeploy: record})}>Update Image</Button>
             <Button size="small" icon={<ShareAltOutlined />} onClick={() => this.setState({exposeDeploy: record})}>Expose</Button>
+            <Button size="small" icon={<LinkOutlined />} onClick={() => this.setState({domainDeploy: record})}>Bind Domain</Button>
             <Popconfirm
               title={`Delete Deployment "${record.name}"?`}
               okText="Delete" okType="danger" cancelText="Cancel"
@@ -372,7 +413,7 @@ class DeploymentListPage extends React.Component {
             <div>
               <span style={{fontWeight: 600}}>Deployments</span>
               &nbsp;&nbsp;&nbsp;&nbsp;
-              <Button icon={<ReloadOutlined />} onClick={() => this.fetchDeployments()} loading={loading} size="small">Refresh</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => {this.fetchDeployments(); this.fetchIngresses();}} loading={loading} size="small">Refresh</Button>
               &nbsp;&nbsp;
               <Button type="primary" icon={<PlusOutlined />} size="small" onClick={() => this.openAddModal()}>Add</Button>
             </div>
@@ -390,6 +431,14 @@ class DeploymentListPage extends React.Component {
           deploy={exposeDeploy}
           open={exposeDeploy !== null}
           onClose={() => this.setState({exposeDeploy: null})}
+        />
+
+        <DeploymentDomainModal
+          deploy={domainDeploy}
+          services={services}
+          open={domainDeploy !== null}
+          onClose={() => this.setState({domainDeploy: null})}
+          onCreated={() => {this.fetchIngresses(); this.fetchServices();}}
         />
 
         <Modal
