@@ -17,6 +17,7 @@ const RESOURCE_LABELS = {
   "ingresses": "general:Ingresses",
   "statefulsets": "general:Stateful Sets",
   "sites": "general:Sites",
+  "machines": "general:Machines",
 };
 
 function buildBreadcrumbItems(uri) {

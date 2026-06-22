@@ -82,6 +82,12 @@ func InitAPI() {
 	beego.Router("/api/update-site", &controllers.ApiController{}, "POST:UpdateSite")
 	beego.Router("/api/delete-site", &controllers.ApiController{}, "POST:DeleteSite")
 
+	beego.Router("/api/get-global-machines", &controllers.ApiController{}, "GET:GetGlobalMachines")
+	beego.Router("/api/get-machine", &controllers.ApiController{}, "GET:GetMachine")
+	beego.Router("/api/add-machine", &controllers.ApiController{}, "POST:AddMachine")
+	beego.Router("/api/update-machine", &controllers.ApiController{}, "POST:UpdateMachine")
+	beego.Router("/api/delete-machine", &controllers.ApiController{}, "POST:DeleteMachine")
+
 	beego.Router("/api/get-configmaps", &controllers.ApiController{}, "GET:GetConfigMaps")
 	beego.Router("/api/get-configmap", &controllers.ApiController{}, "GET:GetConfigMap")
 	beego.Router("/api/add-configmap", &controllers.ApiController{}, "POST:AddConfigMap")

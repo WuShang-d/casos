@@ -43,6 +43,8 @@ import NetworkPolicyListPage from "./NetworkPolicyListPage";
 import DashboardPage from "./DashboardPage";
 import SiteListPage from "./SiteListPage";
 import SiteEditPage from "./SiteEditPage";
+import MachineListPage from "./MachineListPage";
+import MachineEditPage from "./MachineEditPage";
 import AppStorePage from "./AppStorePage";
 import AdmissionPolicyPage from "./AdmissionPolicyPage";
 import AuthorizationPolicyPage from "./AuthorizationPolicyPage";
@@ -229,6 +231,9 @@ function ManagementPage(props) {
         Setting.getItem(<Link to="/authorization-policy">{i18next.t("general:Authorization Policy")}</Link>, "/authorization-policy"),
         Setting.getItem(<Link to="/trivy-scans">{i18next.t("general:Image Scan")}</Link>, "/trivy-scans"),
       ]),
+      Setting.getItem(<Link to="/machines">{i18next.t("general:Infrastructure")}</Link>, "/infrastructure", <ClusterOutlined />, [
+        Setting.getItem(<Link to="/machines">{i18next.t("general:Machines")}</Link>, "/machines"),
+      ]),
       Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Admin")}</Link>, "/admin", <LayoutOutlined />, [
         Setting.getItem(<Link to="/sites/site-built-in">{i18next.t("general:Sites")}</Link>, "/sites"),
       ]),
@@ -265,6 +270,8 @@ function ManagementPage(props) {
         <Route exact path="/trivy-scans" render={(props) => <TrivyScanPage {...props} />} />
         <Route exact path="/sites" render={(props) => <SiteListPage account={account} {...props} />} />
         <Route exact path="/sites/:siteName" render={(props) => <SiteEditPage account={account} onUpdateSite={onUpdateSite} {...props} />} />
+        <Route exact path="/machines" render={(props) => <MachineListPage account={account} {...props} />} />
+        <Route exact path="/machines/:machineName" render={(props) => <MachineEditPage account={account} {...props} />} />
         <Route path="" render={() => <Result status="404" title="404 NOT FOUND" subTitle="Sorry, the page you visited does not exist." extra={<a href="/"><Button type="primary">Back Home</Button></a>} />} />
       </Switch>
     );
