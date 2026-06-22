@@ -139,7 +139,7 @@ class MachineListPage extends React.Component {
         width: "120px",
       },
       {
-        title: i18next.t("machine:Role"),
+        title: i18next.t("policy:Role"),
         dataIndex: "role",
         key: "role",
         width: "120px",
@@ -206,19 +206,19 @@ class MachineListPage extends React.Component {
           destroyOnHidden
         >
           <Form ref={this.formRef} layout="vertical">
-            <Form.Item label={i18next.t("general:Name")} name="name" rules={[{required: true, message: i18next.t("rbac:required")}, {pattern: /^[a-z0-9-]+$/, message: "lowercase letters, digits and dashes only"}]}>
+            <Form.Item label={i18next.t("general:Name")} name="name" rules={[{required: true, message: i18next.t("policy:required")}, {pattern: /^[a-z0-9-]+$/, message: "lowercase letters, digits and dashes only"}]}>
               <Input placeholder="my-machine" />
             </Form.Item>
             <Form.Item label={i18next.t("general:Display name")} name="displayName">
               <Input placeholder="My Machine" />
             </Form.Item>
-            <Form.Item label={i18next.t("machine:IP address")} name="ip" rules={[{required: true, message: i18next.t("rbac:required")}]}>
+            <Form.Item label={i18next.t("machine:IP address")} name="ip" rules={[{required: true, message: i18next.t("policy:required")}]}>
               <Input placeholder="192.168.1.10" />
             </Form.Item>
-            <Form.Item label={i18next.t("machine:SSH port")} name="port" rules={[{required: true, message: i18next.t("rbac:required")}]}>
+            <Form.Item label={i18next.t("machine:SSH port")} name="port" rules={[{required: true, message: i18next.t("policy:required")}]}>
               <InputNumber style={{width: "100%"}} min={1} max={65535} />
             </Form.Item>
-            <Form.Item label={i18next.t("machine:Username")} name="username" rules={[{required: true, message: i18next.t("rbac:required")}]}>
+            <Form.Item label={i18next.t("machine:Username")} name="username" rules={[{required: true, message: i18next.t("policy:required")}]}>
               <Input placeholder="root" />
             </Form.Item>
             <Form.Item label={i18next.t("machine:Auth type")} name="authType">
@@ -229,11 +229,11 @@ class MachineListPage extends React.Component {
             </Form.Item>
             <Form.Item noStyle shouldUpdate={(prev, cur) => prev.authType !== cur.authType}>
               {({getFieldValue}) => getFieldValue("authType") === "privateKey" ? (
-                <Form.Item label={i18next.t("machine:Private key")} name="privateKey" rules={[{required: true, message: i18next.t("rbac:required")}]}>
+                <Form.Item label={i18next.t("machine:Private key")} name="privateKey" rules={[{required: true, message: i18next.t("policy:required")}]}>
                   <Input.TextArea rows={4} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" />
                 </Form.Item>
               ) : (
-                <Form.Item label={i18next.t("machine:Password")} name="password" rules={[{required: true, message: i18next.t("rbac:required")}]}>
+                <Form.Item label={i18next.t("machine:Password")} name="password" rules={[{required: true, message: i18next.t("policy:required")}]}>
                   <Input.Password />
                 </Form.Item>
               )}

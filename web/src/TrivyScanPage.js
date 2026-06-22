@@ -84,7 +84,7 @@ class TrivyScanPage extends React.Component {
         render: (v) => <Text code style={{wordBreak: "break-all"}}>{v}</Text>,
       },
       {
-        title: i18next.t("trivy:Status"),
+        title: i18next.t("general:Status"),
         dataIndex: "status",
         key: "status",
         width: 100,

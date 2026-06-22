@@ -93,10 +93,10 @@ class MachineEditPage extends React.Component {
           </Space>
         </div>
 
-        <Card size="small" title={renderCardTitle(i18next.t("general:General Settings"), i18next.t("machine:General Settings desc"))} style={sectionCardStyle} headStyle={cardHeadStyle}>
+        <Card size="small" title={renderCardTitle(i18next.t("general:General Settings"), i18next.t("general:General Settings desc"))} style={sectionCardStyle} headStyle={cardHeadStyle}>
           <Row gutter={rowGutter}>
             {this.renderField(
-              Setting.getLabel(i18next.t("general:Name"), i18next.t("machine:Name - Tooltip")),
+              Setting.getLabel(i18next.t("general:Name"), i18next.t("general:Name - Tooltip")),
               <Input value={machine.name} disabled onChange={e => this.updateMachineField("name", e.target.value)} />,
               8
             )}
@@ -106,11 +106,11 @@ class MachineEditPage extends React.Component {
               8
             )}
             {this.renderField(
-              Setting.getLabel(i18next.t("machine:Role"), i18next.t("machine:Role - Tooltip")),
+              Setting.getLabel(i18next.t("policy:Role"), i18next.t("machine:Role - Tooltip")),
               <Select
                 value={machine.role || undefined}
                 allowClear
-                placeholder={i18next.t("machine:Role")}
+                placeholder={i18next.t("policy:Role")}
                 style={{width: "100%"}}
                 options={[
                   {label: "master", value: "master"},
