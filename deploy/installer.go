@@ -33,7 +33,8 @@ func (d *NodeDeployer) installNodeBinaries(ctx context.Context, runner *NodeDepl
 	d.logStep(nodeDeployPhaseInstalling, "Ensuring upstream kubelet, kube-proxy, and CNI plugins")
 	installCmd := fmt.Sprintf(`set -e
 download() {
-  curl -fsSL --connect-timeout 20 --max-time 600 --retry 2 --retry-delay 5 --retry-connrefused "$@"
+  url="$3"
+  curl -fsSL --connect-timeout 20 --max-time 600 --retry 2 --retry-delay 5 --retry-connrefused "$@" || { echo "download failed: $url" >&2; exit 22; }
 }
 needs_kube_binary() {
   path="$1"
@@ -44,11 +45,11 @@ needs_kube_binary() {
   return 0
 }
 if needs_kube_binary /usr/local/bin/kubelet; then
-  download -o /tmp/kubelet https://dl.k8s.io/%s/bin/linux/%s/kubelet
+  download -o /tmp/kubelet https://dl.k8s.io/release/%s/bin/linux/%s/kubelet
   install -o root -g root -m 0755 /tmp/kubelet /usr/local/bin/kubelet
 fi
 if needs_kube_binary /usr/local/bin/kube-proxy; then
-  download -o /tmp/kube-proxy https://dl.k8s.io/%s/bin/linux/%s/kube-proxy
+  download -o /tmp/kube-proxy https://dl.k8s.io/release/%s/bin/linux/%s/kube-proxy
   install -o root -g root -m 0755 /tmp/kube-proxy /usr/local/bin/kube-proxy
 fi
 mkdir -p /opt/cni/bin /etc/cni/net.d

@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -220,6 +221,11 @@ func (d *NodeDeployer) apiserverVersion() (string, error) {
 	version := info.GitVersion
 	if version == "" {
 		return "", fmt.Errorf("apiserver returned empty version")
+	}
+	// Strip distro suffixes like "-k3s1", "-eks-1" so the version maps to a
+	// valid dl.k8s.io release path (e.g. "v1.36.1-k3s1" → "v1.36.1").
+	if idx := strings.Index(version[1:], "-"); idx != -1 {
+		version = version[:idx+1]
 	}
 	return version, nil
 }
