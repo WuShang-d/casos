@@ -24,6 +24,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 	sigsyaml "sigs.k8s.io/yaml"
+
+	proxypkg "github.com/casosorg/casos/proxy"
 )
 
 // ---------- Types ----------
@@ -118,12 +120,22 @@ func newHelmConfig(cfg *rest.Config, namespace string) (*action.Configuration, e
 	return actionConfig, nil
 }
 
+// ---------- HTTP helper ----------
+
+func helmGet(url string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Helm/3.21.2")
+	return proxypkg.ProxyHttpClient.Do(req)
+}
+
 // ---------- Repo index ----------
 
 func fetchIndexFile(repoURL string) (*repo.IndexFile, error) {
 	indexURL := strings.TrimRight(repoURL, "/") + "/index.yaml"
-	client := &http.Client{Timeout: 20 * time.Second}
-	resp, err := client.Get(indexURL)
+	resp, err := helmGet(indexURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch index: %w", err)
 	}
@@ -215,8 +227,7 @@ func loadChart(chartName, repoURL, version string) (*chart.Chart, error) {
 		chartURL = strings.TrimRight(repoURL, "/") + "/" + strings.TrimLeft(chartURL, "/")
 	}
 
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(chartURL)
+	resp, err := helmGet(chartURL)
 	if err != nil {
 		return nil, fmt.Errorf("download chart: %w", err)
 	}
