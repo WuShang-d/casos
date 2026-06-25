@@ -37,6 +37,7 @@ import PvcListPage from "./PvcListPage";
 import IngressListPage from "./IngressListPage";
 import DaemonSetListPage from "./DaemonSetListPage";
 import StatefulSetListPage from "./StatefulSetListPage";
+import JobListPage from "./JobListPage";
 import CronJobListPage from "./CronJobListPage";
 import ResourceQuotaListPage from "./ResourceQuotaListPage";
 import HPAListPage from "./HPAListPage";
@@ -58,7 +59,7 @@ const {Header, Footer, Content, Sider} = Layout;
 function getMenuParentKey(uri) {
   if (!uri) {return null;}
   if (uri === "/dashboard" || uri === "/app-store") {return null;}
-  if (uri.includes("/pods") || uri.includes("/deployments") || uri.includes("/statefulsets") || uri.includes("/daemonsets") || uri.includes("/cronjobs") || uri.includes("/hpas") || uri.includes("/log-search")) {return "/workloads";}
+  if (uri.includes("/pods") || uri.includes("/deployments") || uri.includes("/statefulsets") || uri.includes("/daemonsets") || uri.includes("/jobs") || uri.includes("/cronjobs") || uri.includes("/hpas") || uri.includes("/log-search")) {return "/workloads";}
   if (uri.includes("/nodes") || uri.includes("/namespaces") || uri.includes("/serviceaccounts")) {return "/cluster";}
   if (uri.includes("/configmaps") || uri.includes("/secrets") || uri.includes("/pvcs") || uri.includes("/resourcequotas")) {return "/configuration";}
   if (uri.includes("/ingresses") || uri.includes("/networkpolicies")) {return "/networking";}
@@ -206,6 +207,7 @@ function ManagementPage(props) {
         Setting.getItem(<Link to="/statefulsets">{i18next.t("general:Stateful Sets")}</Link>, "/statefulsets"),
         Setting.getItem(<Link to="/daemonsets">{i18next.t("general:Daemon Sets")}</Link>, "/daemonsets"),
         Setting.getItem(<Link to="/pods">{i18next.t("general:Pods")}</Link>, "/pods"),
+        Setting.getItem(<Link to="/jobs">{i18next.t("general:Jobs")}</Link>, "/jobs"),
         Setting.getItem(<Link to="/cronjobs">{i18next.t("general:Cron Jobs")}</Link>, "/cronjobs"),
         Setting.getItem(<Link to="/hpas">{i18next.t("general:Horizontal Pod Autoscaler")}</Link>, "/hpas"),
         Setting.getItem(<Link to="/log-search"><FileSearchOutlined /> {i18next.t("general:Log Search")}</Link>, "/log-search"),
@@ -253,6 +255,7 @@ function ManagementPage(props) {
         <Route exact path="/statefulsets" render={(props) => <StatefulSetListPage {...props} />} />
         <Route exact path="/daemonsets" render={(props) => <DaemonSetListPage {...props} />} />
         <Route exact path="/pods" render={(props) => <PodListPage {...props} />} />
+        <Route exact path="/jobs" render={(props) => <JobListPage {...props} />} />
         <Route exact path="/cronjobs" render={(props) => <CronJobListPage {...props} />} />
         <Route exact path="/hpas" render={(props) => <HPAListPage {...props} />} />
         <Route exact path="/log-search" render={(props) => <LogSearchPage {...props} />} />

@@ -137,6 +137,12 @@ func InitAPI() {
 	beego.Router("/api/update-networkpolicy", &controllers.ApiController{}, "POST:UpdateNetworkPolicy")
 	beego.Router("/api/delete-networkpolicy", &controllers.ApiController{}, "POST:DeleteNetworkPolicy")
 
+	beego.Router("/api/get-jobs", &controllers.ApiController{}, "GET:GetJobs")
+	beego.Router("/api/get-job", &controllers.ApiController{}, "GET:GetJob")
+	beego.Router("/api/add-job", &controllers.ApiController{}, "POST:AddJob")
+	beego.Router("/api/update-job", &controllers.ApiController{}, "POST:UpdateJob")
+	beego.Router("/api/delete-job", &controllers.ApiController{}, "POST:DeleteJob")
+
 	beego.Router("/api/get-cronjobs", &controllers.ApiController{}, "GET:GetCronJobs")
 	beego.Router("/api/get-cronjob", &controllers.ApiController{}, "GET:GetCronJob")
 	beego.Router("/api/add-cronjob", &controllers.ApiController{}, "POST:AddCronJob")
