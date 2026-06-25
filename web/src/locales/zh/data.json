@@ -98,7 +98,9 @@
     "Release name pattern": "仅小写字母、数字和连字符",
     "Version": "版本",
     "Values (YAML)": "Values (YAML)",
-    "Loading values": "加载默认配置中"
+    "Loading values": "加载默认配置中",
+    "Abort": "中止",
+    "Install aborted": "安装已中止 — 部分资源可能已创建"
   },
   "machine": {
     "Add Machine": "Add Machine",

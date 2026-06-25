@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -336,26 +337,35 @@ func InstallHelmChart(cfg *rest.Config, releaseName, namespace, chartName, repoU
 
 // InstallHelmChartStream runs helm install asynchronously and pushes log lines to the returned channel.
 // The channel is closed when the operation finishes; a final line of "ERROR: <msg>" or "DONE" signals the outcome.
-func InstallHelmChartStream(cfg *rest.Config, releaseName, namespace, chartName, repoURL, version, valuesYAML string) <-chan string {
-	ch := make(chan string, 64)
+// Cancel ctx to abort a waiting install (e.g. stuck waiting for PVCs).
+func InstallHelmChartStream(ctx context.Context, cfg *rest.Config, releaseName, namespace, chartName, repoURL, version, valuesYAML string) <-chan string {
+	logCh := make(chan string, 64)
 	go func() {
-		defer close(ch)
+		defer close(logCh)
+		send := func(line string) bool {
+			select {
+			case logCh <- line:
+				return true
+			case <-ctx.Done():
+				return false
+			}
+		}
 		logFn := func(format string, args ...interface{}) {
-			ch <- fmt.Sprintf(format, args...)
+			send(fmt.Sprintf(format, args...))
 		}
 		actionConfig, err := newHelmConfigWithLog(cfg, namespace, logFn)
 		if err != nil {
-			ch <- "ERROR: " + err.Error()
+			send("ERROR: " + err.Error())
 			return
 		}
-		chart, err := loadChart(chartName, repoURL, version)
+		helmChart, err := loadChart(chartName, repoURL, version)
 		if err != nil {
-			ch <- "ERROR: " + err.Error()
+			send("ERROR: " + err.Error())
 			return
 		}
 		vals, err := parseValues(valuesYAML)
 		if err != nil {
-			ch <- "ERROR: " + err.Error()
+			send("ERROR: " + err.Error())
 			return
 		}
 		install := action.NewInstall(actionConfig)
@@ -364,13 +374,17 @@ func InstallHelmChartStream(cfg *rest.Config, releaseName, namespace, chartName,
 		install.CreateNamespace = true
 		install.Wait = true
 		install.Timeout = 5 * time.Minute
-		if _, err = install.Run(chart, vals); err != nil {
-			ch <- "ERROR: " + err.Error()
+		if _, err = install.RunWithContext(ctx, helmChart, vals); err != nil {
+			if ctx.Err() != nil {
+				send("ABORTED")
+			} else {
+				send("ERROR: " + err.Error())
+			}
 			return
 		}
-		ch <- "DONE"
+		send("DONE")
 	}()
-	return ch
+	return logCh
 }
 
 func UpgradeHelmRelease(cfg *rest.Config, releaseName, namespace, chartName, repoURL, version, valuesYAML string) error {

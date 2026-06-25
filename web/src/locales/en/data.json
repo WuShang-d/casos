@@ -98,7 +98,9 @@
     "Release name pattern": "Lowercase letters, numbers, and hyphens only",
     "Version": "Version",
     "Values (YAML)": "Values (YAML)",
-    "Loading values": "Loading default values"
+    "Loading values": "Loading default values",
+    "Abort": "Abort",
+    "Install aborted": "Install aborted — resources may have been partially created"
   },
   "machine": {
     "Add Machine": "Add Machine",

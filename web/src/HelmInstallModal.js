@@ -13,16 +13,19 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
   const [valuesYAML, setValuesYAML] = useState("");
   const [valuesLoading, setValuesLoading] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [aborted, setAborted] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
   const logEndRef = useRef(null);
+  const abortCtrlRef = useRef(null);
 
   useEffect(() => {
     if (!open || !chart) {return;}
     setError(null);
     setLogs([]);
     setDone(false);
+    setAborted(false);
 
     NamespaceBackend.getNamespaces().then(res => {
       if (res.status === "ok") {
@@ -64,20 +67,32 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
     setError(null);
     setLogs([]);
     setDone(false);
+    setAborted(false);
     setInstalling(false);
     onClose();
   };
 
+  const handleAbort = () => {
+    if (abortCtrlRef.current) {
+      abortCtrlRef.current.abort();
+    }
+  };
+
   const handleOk = () => {
-    if (done) {
-      onInstalled?.();
+    if (done || aborted) {
+      if (done) {onInstalled?.();}
       handleClose();
       return;
     }
     form.validateFields().then(values => {
       setInstalling(true);
+      setAborted(false);
       setError(null);
       setLogs([]);
+
+      const ctrl = new AbortController();
+      abortCtrlRef.current = ctrl;
+
       HelmBackend.installHelmChartStream(
         {
           releaseName: values.releaseName,
@@ -87,13 +102,24 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
           version: values.version || chart.version,
           valuesYAML,
         },
-        line => setLogs(prev => [...prev, line])
+        line => {
+          if (line === "ABORTED") {
+            setAborted(true);
+          } else {
+            setLogs(prev => [...prev, line]);
+          }
+        },
+        ctrl.signal
       )
         .then(() => {
           setDone(true);
           onInstalled?.();
         })
-        .catch(e => setError(e.message))
+        .catch(e => {
+          if (e.name !== "AbortError") {
+            setError(e.message);
+          }
+        })
         .finally(() => setInstalling(false));
     });
   };
@@ -101,7 +127,13 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
   if (!chart) {return null;}
 
   const nsOptions = namespaces.map(ns => ({label: ns.name, value: ns.name}));
-  const showLog = installing || done || error;
+  const showLog = installing || done || aborted || (error && logs.length > 0);
+
+  const lineColor = (line, i, total) => {
+    if (line.startsWith("ERROR")) {return "#f87171";}
+    if (done && i === total - 1) {return "#4ade80";}
+    return "#d4d4d4";
+  };
 
   return (
     <Modal
@@ -121,15 +153,20 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
       maskClosable={!installing}
       footer={
         <div style={{display: "flex", justifyContent: "flex-end", gap: 8}}>
-          {!installing && (
-            <Button onClick={handleClose}>{done ? t("general:Close") : t("general:Cancel")}</Button>
+          {installing && (
+            <Button danger onClick={handleAbort}>{t("helm:Abort")}</Button>
           )}
-          {!done && (
+          {!installing && (
+            <Button onClick={handleClose}>
+              {done || aborted ? t("general:Close") : t("general:Cancel")}
+            </Button>
+          )}
+          {!done && !aborted && (
             <Button type="primary" loading={installing} onClick={handleOk}>
               {t("helm:Install")}
             </Button>
           )}
-          {done && (
+          {(done || aborted) && (
             <Button type="primary" onClick={handleOk}>
               {t("general:Done")}
             </Button>
@@ -141,6 +178,9 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
     >
       {error && (
         <Alert type="error" message={error} showIcon style={{marginBottom: 16}} closable onClose={() => setError(null)} />
+      )}
+      {aborted && (
+        <Alert type="warning" message={t("helm:Install aborted")} showIcon style={{marginBottom: 16}} />
       )}
 
       {!showLog && (
@@ -194,7 +234,7 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
           style={{
             background: "#1a1a1a", borderRadius: 6, padding: "10px 14px",
             fontFamily: "monospace", fontSize: 12, color: "#d4d4d4",
-            height: 320, overflowY: "auto", lineHeight: 1.6,
+            height: 340, overflowY: "auto", lineHeight: 1.6,
           }}
         >
           {logs.length === 0 && installing && (
@@ -204,10 +244,15 @@ export default function HelmInstallModal({open, chart, onClose, onInstalled}) {
             </span>
           )}
           {logs.map((line, i) => (
-            <div key={i} style={{color: line.startsWith("ERROR") ? "#f87171" : done && i === logs.length - 1 ? "#4ade80" : "#d4d4d4"}}>
+            <div key={i} style={{color: lineColor(line, i, logs.length)}}>
               {line}
             </div>
           ))}
+          {installing && logs.length > 0 && (
+            <span style={{color: "#888", display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4}}>
+              <Spin size="small" />
+            </span>
+          )}
           <div ref={logEndRef} />
         </div>
       )}

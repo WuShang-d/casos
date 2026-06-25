@@ -237,9 +237,12 @@ func (c *ApiController) InstallHelmChartStream() {
 	w.WriteHeader(http.StatusOK)
 
 	flusher, canFlush := w.(http.Flusher)
-	logCh := store.InstallHelmChartStream(cfg, req.ReleaseName, req.Namespace, req.ChartName, req.RepoURL, req.Version, req.ValuesYAML)
+	ctx := c.Ctx.Request.Context()
+	logCh := store.InstallHelmChartStream(ctx, cfg, req.ReleaseName, req.Namespace, req.ChartName, req.RepoURL, req.Version, req.ValuesYAML)
 	for line := range logCh {
-		fmt.Fprintf(w, "data: %s\n\n", line)
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", line); err != nil {
+			break
+		}
 		if canFlush {
 			flusher.Flush()
 		}
