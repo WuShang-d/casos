@@ -7,7 +7,7 @@ import {
   ClusterOutlined,
   DashboardOutlined,
   DownOutlined,
-  FileSearchOutlined,
+  FundViewOutlined,
   LayoutOutlined,
   LockOutlined,
   LogoutOutlined,
@@ -59,9 +59,10 @@ const {Header, Footer, Content, Sider} = Layout;
 function getMenuParentKey(uri) {
   if (!uri) {return null;}
   if (uri === "/dashboard" || uri === "/app-store") {return null;}
-  if (uri.includes("/pods") || uri.includes("/deployments") || uri.includes("/statefulsets") || uri.includes("/daemonsets") || uri.includes("/jobs") || uri.includes("/cronjobs") || uri.includes("/hpas") || uri.includes("/log-search")) {return "/workloads";}
+  if (uri.includes("/pods") || uri.includes("/deployments") || uri.includes("/statefulsets") || uri.includes("/daemonsets") || uri.includes("/jobs") || uri.includes("/cronjobs")) {return "/workloads";}
+  if (uri.includes("/log-search")) {return "/observability";}
   if (uri.includes("/nodes") || uri.includes("/namespaces") || uri.includes("/serviceaccounts")) {return "/cluster";}
-  if (uri.includes("/configmaps") || uri.includes("/secrets") || uri.includes("/pvcs") || uri.includes("/resourcequotas")) {return "/configuration";}
+  if (uri.includes("/configmaps") || uri.includes("/secrets") || uri.includes("/pvcs") || uri.includes("/resourcequotas") || uri.includes("/hpas")) {return "/configuration";}
   if (uri.includes("/ingresses") || uri.includes("/networkpolicies")) {return "/networking";}
   if (uri.includes("/services")) {return "/networking";}
   if (uri.includes("/clusterrolebindings") || uri.includes("/rolebindings")) {return "/accesscontrol";}
@@ -71,7 +72,7 @@ function getMenuParentKey(uri) {
 }
 
 const siderMenuOpenKeysLsKey = "siderMenuOpenKeys";
-const defaultMenuOpenKeys = ["/workloads", "/cluster", "/configuration", "/networking", "/accesscontrol", "/admin"];
+const defaultMenuOpenKeys = ["/workloads", "/cluster", "/configuration", "/networking", "/accesscontrol", "/observability", "/admin"];
 
 function readSavedMenuOpenKeys() {
   try {
@@ -203,14 +204,12 @@ function ManagementPage(props) {
       Setting.getItem(<Link to="/dashboard">{i18next.t("general:Dashboard")}</Link>, "/dashboard", <DashboardOutlined />),
       Setting.getItem(<Link to="/app-store">{i18next.t("general:App Store")}</Link>, "/app-store", <ShopOutlined />),
       Setting.getItem(<Link to="/pods">{i18next.t("general:Workloads")}</Link>, "/workloads", <AppstoreOutlined />, [
+        Setting.getItem(<Link to="/pods">{i18next.t("general:Pods")}</Link>, "/pods"),
         Setting.getItem(<Link to="/deployments">{i18next.t("general:Deployments")}</Link>, "/deployments"),
         Setting.getItem(<Link to="/statefulsets">{i18next.t("general:Stateful Sets")}</Link>, "/statefulsets"),
         Setting.getItem(<Link to="/daemonsets">{i18next.t("general:Daemon Sets")}</Link>, "/daemonsets"),
-        Setting.getItem(<Link to="/pods">{i18next.t("general:Pods")}</Link>, "/pods"),
         Setting.getItem(<Link to="/jobs">{i18next.t("general:Jobs")}</Link>, "/jobs"),
         Setting.getItem(<Link to="/cronjobs">{i18next.t("general:Cron Jobs")}</Link>, "/cronjobs"),
-        Setting.getItem(<Link to="/hpas">{i18next.t("general:Horizontal Pod Autoscaler")}</Link>, "/hpas"),
-        Setting.getItem(<Link to="/log-search"><FileSearchOutlined /> {i18next.t("general:Log Search")}</Link>, "/log-search"),
       ]),
       Setting.getItem(<Link to="/nodes">{i18next.t("general:Cluster")}</Link>, "/cluster", <ClusterOutlined />, [
         Setting.getItem(<Link to="/nodes">{i18next.t("general:Nodes")}</Link>, "/nodes"),
@@ -222,6 +221,7 @@ function ManagementPage(props) {
         Setting.getItem(<Link to="/secrets">{i18next.t("general:Secrets")}</Link>, "/secrets"),
         Setting.getItem(<Link to="/pvcs">{i18next.t("general:Persistent Volume Claims")}</Link>, "/pvcs"),
         Setting.getItem(<Link to="/resourcequotas">{i18next.t("general:Resource Quotas")}</Link>, "/resourcequotas"),
+        Setting.getItem(<Link to="/hpas">{i18next.t("general:Horizontal Pod Autoscaler")}</Link>, "/hpas"),
       ]),
       Setting.getItem(<Link to="/services">{i18next.t("general:Networking")}</Link>, "/networking", <NodeIndexOutlined />, [
         Setting.getItem(<Link to="/services">{i18next.t("general:Services")}</Link>, "/services"),
@@ -234,6 +234,9 @@ function ManagementPage(props) {
         Setting.getItem(<Link to="/admission-policy">{i18next.t("general:Admission Policy")}</Link>, "/admission-policy"),
         Setting.getItem(<Link to="/authorization-policy">{i18next.t("general:Authorization Policy")}</Link>, "/authorization-policy"),
         Setting.getItem(<Link to="/trivy-scans">{i18next.t("general:Image Scan")}</Link>, "/trivy-scans"),
+      ]),
+      Setting.getItem(<Link to="/log-search">{i18next.t("general:Observability")}</Link>, "/observability", <FundViewOutlined />, [
+        Setting.getItem(<Link to="/log-search">{i18next.t("general:Log Search")}</Link>, "/log-search"),
       ]),
       Setting.getItem(<Link to="/machines">{i18next.t("general:Infrastructure")}</Link>, "/infrastructure", <ClusterOutlined />, [
         Setting.getItem(<Link to="/machines">{i18next.t("general:Machines")}</Link>, "/machines"),
