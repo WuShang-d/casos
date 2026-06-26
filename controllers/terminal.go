@@ -55,13 +55,14 @@ func pumpTerminalInput(
 	stdin *io.PipeWriter,
 	resizeCh chan<- termResizeMsg,
 	cancel context.CancelFunc,
+	closeConn func(),
 ) {
 	done := make(chan struct{})
 	go func() {
 		select {
 		case <-ctx.Done():
 			// Closing the WebSocket unblocks ReadMessage when the exec context ends.
-			_ = conn.Close()
+			closeConn()
 		case <-done:
 		}
 	}()
@@ -147,7 +148,9 @@ func (c *ApiController) PodTerminal() {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	var closeOnce sync.Once
+	closeConn := func() { closeOnce.Do(func() { _ = conn.Close() }) }
+	defer closeConn()
 
 	writeMu := &sync.Mutex{}
 	clientset, err := kubernetes.NewForConfig(cfg)
@@ -183,7 +186,7 @@ func (c *ApiController) PodTerminal() {
 	defer stdinReader.Close()
 
 	resizeCh := make(chan termResizeMsg, 4)
-	go pumpTerminalInput(ctx, conn, stdinWriter, resizeCh, cancel)
+	go pumpTerminalInput(ctx, conn, stdinWriter, resizeCh, cancel, closeConn)
 
 	writer := &wsPipeWriter{conn: conn, mu: writeMu}
 	if err := exec.StreamWithContext(ctx, remotecommand.StreamOptions{
