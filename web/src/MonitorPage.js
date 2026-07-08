@@ -37,6 +37,11 @@ const eventTypeColor = {
   Warning: "gold",
 };
 
+const nowrapStyle = {whiteSpace: "nowrap"};
+const ellipsisTextStyle = {display: "block", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"};
+const checkNameCellStyle = {minWidth: 280, maxWidth: 280};
+const checkTableScrollX = 1560;
+
 function registerMonitorI18nKeys() {
   // The existing i18n generator only scans literal i18next.t(...) calls.
   i18next.t("monitor:Abnormal Pods");
@@ -94,10 +99,30 @@ function renderStatusTag(status, t) {
 function compactText(value, maxWidth = 460) {
   return (
     <Tooltip title={value}>
-      <div style={{maxWidth, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+      <div style={{maxWidth, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
         {value || "-"}
       </div>
     </Tooltip>
+  );
+}
+
+function nowrapTitle(value) {
+  return <span style={nowrapStyle}>{value}</span>;
+}
+
+function renderCheckName(value, record) {
+  const name = value || "-";
+  const id = record.id || "-";
+
+  return (
+    <Space direction="vertical" size={0} style={{display: "flex", minWidth: 0}}>
+      <Tooltip title={name}>
+        <Text strong style={ellipsisTextStyle}>{name}</Text>
+      </Tooltip>
+      <Tooltip title={id}>
+        <Text type="secondary" style={{...ellipsisTextStyle, fontSize: 12}}>{id}</Text>
+      </Tooltip>
+    </Space>
   );
 }
 
@@ -154,55 +179,57 @@ function MonitorPage() {
 
   const checkColumns = useMemo(() => [
     {
-      title: t("monitor:Check"),
+      title: nowrapTitle(t("monitor:Check")),
       dataIndex: "name",
       key: "name",
-      width: 260,
-      render: (value, record) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{value}</Text>
-          <Text type="secondary" style={{fontSize: 12}}>{record.id}</Text>
-        </Space>
-      ),
+      width: 280,
+      onCell: () => ({style: checkNameCellStyle}),
+      render: renderCheckName,
     },
     {
-      title: t("monitor:Category"),
+      title: nowrapTitle(t("monitor:Category")),
       dataIndex: "category",
       key: "category",
-      width: 120,
+      width: 130,
+      onCell: () => ({style: nowrapStyle}),
       render: value => <Tag>{value}</Tag>,
     },
     {
-      title: t("general:Status"),
+      title: nowrapTitle(t("general:Status")),
       dataIndex: "status",
       key: "status",
       width: 130,
+      onCell: () => ({style: nowrapStyle}),
       render: value => renderStatusTag(value, t),
     },
     {
-      title: t("trivy:Severity"),
+      title: nowrapTitle(t("trivy:Severity")),
       dataIndex: "severity",
       key: "severity",
-      width: 110,
+      width: 130,
+      onCell: () => ({style: nowrapStyle}),
       render: value => <Tag color={severityColor[value] || "default"}>{t(`monitor:severity ${value || "info"}`)}</Tag>,
     },
     {
-      title: t("monitor:Message"),
+      title: nowrapTitle(t("monitor:Message")),
       dataIndex: "message",
       key: "message",
-      render: value => compactText(value),
+      width: 340,
+      render: value => compactText(value, 320),
     },
     {
-      title: t("monitor:Suggestion"),
+      title: nowrapTitle(t("monitor:Suggestion")),
       dataIndex: "suggestion",
       key: "suggestion",
-      render: value => compactText(value, 360),
+      width: 360,
+      render: value => compactText(value, 340),
     },
     {
-      title: t("monitor:Last Checked"),
+      title: nowrapTitle(t("monitor:Last Checked")),
       dataIndex: "lastCheckedAt",
       key: "lastCheckedAt",
       width: 190,
+      onCell: () => ({style: nowrapStyle}),
       render: formatTime,
     },
   ], [t]);
@@ -374,7 +401,7 @@ function MonitorPage() {
           dataSource={checks}
           loading={loading}
           pagination={false}
-          scroll={{x: 1180}}
+          scroll={{x: checkTableScrollX}}
         />
       </Card>
 
