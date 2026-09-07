@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os/exec"
@@ -84,6 +85,11 @@ func runLocalNodeBootstrap(ctx context.Context) {
 		err := bootstrapLocalNode(ctx)
 		if err == nil {
 			logs.Info("automatic node setup: this machine is a Ready worker node")
+			return
+		}
+		if errors.Is(err, wsl.ErrVirtualizationUnavailable) {
+			// Permanent: every further attempt fails the same way.
+			logs.Error("automatic node setup: %v", err)
 			return
 		}
 		logs.Warning("automatic node setup (attempt %d/%d): %v", attempt, localNodeBootstrapAttempts, err)

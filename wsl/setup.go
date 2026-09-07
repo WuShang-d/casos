@@ -3,6 +3,7 @@ package wsl
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -33,6 +34,34 @@ var applianceDistros = map[string]bool{
 	"rancher-desktop":        true,
 	"rancher-desktop-data":   true,
 	"podman-machine-default": true,
+}
+
+// ErrVirtualizationUnavailable is permanent: a cloud instance sold without
+// nested virtualization answers the same way on every attempt.
+var ErrVirtualizationUnavailable = errors.New("this machine cannot run WSL 2 because the Windows hypervisor is not available to it, which is what a cloud VM without nested virtualization looks like: add a Linux machine on the Machines page instead")
+
+// What WSL reports when the hypervisor is missing. 0x80370102 is the one a VM
+// that cannot nest returns from WslRegisterDistribution.
+var virtualizationErrorMarkers = []string{
+	"0X80370102",
+	"0X80370101",
+	"0X80370114",
+	"WSL_E_VM_MODE_NOT_SUPPORTED",
+	"WSL_E_NOT_SUPPORTED",
+}
+
+// wsl.exe writes the code into its output, not into a distinguishable exit
+// status, so the text is all there is to match on.
+func virtualizationUnavailable(texts ...string) bool {
+	for _, text := range texts {
+		upper := strings.ToUpper(text)
+		for _, marker := range virtualizationErrorMarkers {
+			if strings.Contains(upper, marker) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Distro is one registered WSL distribution.
@@ -160,6 +189,9 @@ func Install(ctx context.Context, distro string, log func(string)) (*Status, err
 	installCtx, cancel := context.WithTimeout(ctx, installTimeout)
 	defer cancel()
 	if err := stream(installCtx, log, "--install", "-d", distro, "--no-launch"); err != nil {
+		if virtualizationUnavailable(err.Error()) {
+			return nil, ErrVirtualizationUnavailable
+		}
 		// Report the failure, but still detect: an install that only needs a
 		// reboot to finish also exits non-zero on some Windows builds.
 		status, detectErr := Detect(ctx)
@@ -174,6 +206,17 @@ func Install(ctx context.Context, distro string, log func(string)) (*Status, err
 	if err != nil {
 		return nil, err
 	}
+	if status.NodeDistro() == nil {
+		// wsl --install exits 0 and registers nothing when the distribution's app
+		// package is already on the host, which is what a failed earlier attempt
+		// leaves behind.
+		if err = registerDistro(ctx, distro, log); err != nil {
+			return status, err
+		}
+		if status, err = Detect(ctx); err != nil {
+			return nil, err
+		}
+	}
 	selected := status.NodeDistro()
 	if selected == nil {
 		return status, fmt.Errorf("WSL was installed but no usable distribution is registered yet: restart Windows to finish enabling WSL, then CasOS will continue automatically")
@@ -182,6 +225,46 @@ func Install(ctx context.Context, distro string, log func(string)) (*Status, err
 		return status, err
 	}
 	return status, nil
+}
+
+// registerDistro creates the distribution from the app package already on the
+// host; --root keeps the interactive account setup out of the way. It is also
+// where a host that cannot run WSL 2 first says so, because everything before
+// it succeeds there and only this step starts a virtual machine.
+func registerDistro(ctx context.Context, distro string, log func(string)) error {
+	launcher := launcherName(distro)
+	path, err := exec.LookPath(launcher)
+	if err != nil {
+		return fmt.Errorf("%s is installed but not registered, and its launcher %s was not found to register it with", distro, launcher)
+	}
+
+	log(fmt.Sprintf("Registering %s", distro))
+	registerCtx, cancel := context.WithTimeout(ctx, firstBootTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(registerCtx, path, "install", "--root")
+	var combined bytes.Buffer
+	cmd.Stdout = &combined
+	cmd.Stderr = &combined
+	err = cmd.Run()
+	text := decodeOutput(combined.Bytes())
+	if virtualizationUnavailable(text) {
+		return ErrVirtualizationUnavailable
+	}
+	if err != nil {
+		return fmt.Errorf("register %s: %w: %s", distro, err, summarize(text))
+	}
+	return nil
+}
+
+// Ubuntu to ubuntu.exe, Ubuntu-22.04 to ubuntu2204.exe.
+func launcherName(distro string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(distro) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String() + ".exe"
 }
 
 // warmUp boots a freshly registered distro once. That first boot unpacks the
@@ -195,6 +278,9 @@ func warmUp(ctx context.Context, distro string, log func(string)) error {
 	stdout, stderr, err := run(bootCtx, distro, true, "echo CASOS_OK=1\n")
 	if strings.Contains(stdout, "CASOS_OK=1") {
 		return nil
+	}
+	if virtualizationUnavailable(stdout, stderr) {
+		return ErrVirtualizationUnavailable
 	}
 	if err != nil {
 		return fmt.Errorf("start %s: %w: %s", distro, err, summarize(stderr, stdout))
