@@ -257,6 +257,7 @@ func registerDistro(ctx context.Context, distro string, log func(string)) error 
 	registerCtx, cancel := context.WithTimeout(ctx, firstBootTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(registerCtx, path, "install", "--root")
+	detachConsole(cmd)
 	var combined bytes.Buffer
 	cmd.Stdout = &combined
 	cmd.Stderr = &combined
