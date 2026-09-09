@@ -174,11 +174,8 @@ func localNodeMachine(ctx context.Context) (*object.Machine, error) {
 }
 
 func localWSLNodeMachine(ctx context.Context) (*object.Machine, error) {
-	distro, err := localWSLNodeDistro(ctx)
+	distro, err := PrepareLocalWSLDistro(ctx, func(line string) { logs.Info("wsl setup: %s", line) })
 	if err != nil {
-		return nil, err
-	}
-	if _, err = wsl.EnsureSystemd(ctx, distro, func(line string) { logs.Info("wsl setup: %s", line) }); err != nil {
 		return nil, err
 	}
 	startWSLKeepAlive(ctx, distro)
@@ -219,20 +216,35 @@ func reenrollWSLNode(ctx context.Context, distro string) {
 	}
 }
 
+// PrepareLocalWSLDistro returns the distro to enroll as a worker node, ready to
+// be enrolled: WSL and a distribution are installed when the host has nothing
+// usable, and the distro is made to boot with systemd. Progress goes to log,
+// because installing a distribution downloads its image and takes minutes.
+func PrepareLocalWSLDistro(ctx context.Context, log func(string)) (string, error) {
+	distro, err := localWSLNodeDistro(ctx, log)
+	if err != nil {
+		return "", err
+	}
+	if _, err = wsl.EnsureSystemd(ctx, distro, log); err != nil {
+		return "", err
+	}
+	return distro, nil
+}
+
 // localWSLNodeDistro returns the distro to enroll, installing WSL first when
 // the host has nothing that can host a node.
-func localWSLNodeDistro(ctx context.Context) (string, error) {
+func localWSLNodeDistro(ctx context.Context, log func(string)) (string, error) {
 	status, err := wsl.Detect(ctx)
 	if err != nil {
 		return "", err
 	}
 	if selected := status.NodeDistro(); selected != nil {
-		logs.Info("automatic node setup: using WSL distribution %s", selected.Name)
+		log(fmt.Sprintf("Using WSL distribution %s", selected.Name))
 		return selected.Name, nil
 	}
 
-	logs.Info("automatic node setup: no usable WSL distribution (%s), installing one", status.Detail)
-	installed, err := wsl.Install(ctx, wsl.DefaultInstallDistro, func(line string) { logs.Info("wsl install: %s", line) })
+	log(fmt.Sprintf("No usable WSL distribution (%s), installing %s", status.Detail, wsl.DefaultInstallDistro))
+	installed, err := wsl.Install(ctx, wsl.DefaultInstallDistro, log)
 	if err != nil {
 		return "", err
 	}
@@ -240,7 +252,7 @@ func localWSLNodeDistro(ctx context.Context) (string, error) {
 	if selected == nil {
 		return "", fmt.Errorf("WSL was installed but no usable distribution is registered yet, restart Windows to finish enabling WSL")
 	}
-	logs.Info("automatic node setup: installed WSL distribution %s", selected.Name)
+	log(fmt.Sprintf("Installed WSL distribution %s", selected.Name))
 	return selected.Name, nil
 }
 

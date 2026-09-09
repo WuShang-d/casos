@@ -43,6 +43,14 @@ export function addLocalWSLMachine() {
   }).then(res => Setting.handleFetchResponse(res));
 }
 
+export function getLocalWSLMachineStatus() {
+  return fetch(`${Setting.ServerUrl}/api/get-local-wsl-machine-status`, {
+    method: "GET",
+    credentials: "include",
+    headers: {"Accept-Language": Setting.getAcceptLanguage()},
+  }).then(res => Setting.handleFetchResponse(res));
+}
+
 export function deleteMachine(machine) {
   return fetch(`${Setting.ServerUrl}/api/delete-machine`, {
     method: "POST",

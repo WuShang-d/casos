@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useCallback, useEffect, useRef, useState} from "react";
 import {Link, useHistory} from "react-router-dom";
 import i18next from "i18next";
 import {CloudCog, MonitorCog, Pencil, Plus, Trash2} from "lucide-react";
@@ -18,6 +18,7 @@ import {NumberInput} from "@/components/shared/number-input";
 import {PasswordInput} from "@/components/shared/password-input";
 import {SimpleSelect} from "@/components/shared/simple-select";
 import {MachineNodeDeploySheet} from "@/components/shared/machine-node-deploy-sheet";
+import {LocalWSLEnrollDialog} from "@/components/shared/local-wsl-enroll-dialog";
 
 export const MACHINE_STATUS_VARIANTS = {
   Online: "success",
@@ -29,6 +30,9 @@ export const MACHINE_STATUS_VARIANTS = {
 };
 
 const NAME_PATTERN = /^[a-z0-9-]+$/;
+
+// Installing a WSL distribution takes minutes, so its progress is polled.
+const WSL_POLL_INTERVAL = 3000;
 
 const emptyForm = {
   name: "",
@@ -53,8 +57,60 @@ function MachineListPage({account}) {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [addingLocalWSL, setAddingLocalWSL] = useState(false);
+  const [wslStatus, setWslStatus] = useState(null);
+  const [wslDialogOpen, setWslDialogOpen] = useState(false);
   const [deployMachine, setDeployMachine] = useState(null);
+
+  const wslRunningRef = useRef(false);
+  const machinesRefreshRef = useRef(refresh);
+  machinesRefreshRef.current = refresh;
+
+  const loadWSLStatus = useCallback(() => {
+    return MachineBackend.getLocalWSLMachineStatus()
+      .then((res) => {
+        if (res.status !== "ok") {
+          return null;
+        }
+        const next = res.data ?? null;
+        setWslStatus(next);
+        // The run that just ended is the one that changed the machine list, and
+        // its result only arrives here, not from the request that started it.
+        if (wslRunningRef.current && next && !next.running) {
+          machinesRefreshRef.current();
+          if (next.error) {
+            Setting.showMessage("error", `${i18next.t("machine:Failed to add local WSL machine")}: ${next.error}`);
+          } else if (next.result?.machine) {
+            const machine = next.result.machine;
+            const summary = `${next.result.distro || machine.name} (${machine.username}@${machine.ip}:${machine.port})`;
+            // Enrolling is idempotent: a second run refreshes the existing
+            // entry rather than failing, and the message says which happened.
+            Setting.showMessage(
+              "success",
+              next.result.created === false
+                ? `${i18next.t("machine:Local WSL machine refreshed")}: ${summary}`
+                : `${i18next.t("machine:Local WSL machine added")}: ${summary}`
+            );
+          }
+        }
+        wslRunningRef.current = Boolean(next?.running);
+        return next;
+      })
+      .catch(() => null);
+  }, []);
+
+  // A run started before this page was opened, or before a reload, is still
+  // worth watching: it owns the machine this page is waiting for.
+  useEffect(() => {
+    loadWSLStatus();
+  }, [loadWSLStatus]);
+
+  useEffect(() => {
+    if (!wslStatus?.running) {
+      return undefined;
+    }
+    const timer = setInterval(loadWSLStatus, WSL_POLL_INTERVAL);
+    return () => clearInterval(timer);
+  }, [wslStatus?.running, loadWSLStatus]);
 
   function openAdd() {
     setForm(emptyForm);
@@ -71,28 +127,25 @@ function MachineListPage({account}) {
     }
   }
 
+  // Enrolling is a background job on the server, because a host without WSL has
+  // a distribution to install first. Starting it only opens the progress
+  // dialog; the outcome arrives through the poll.
   function addLocalWSL() {
-    setAddingLocalWSL(true);
+    setWslDialogOpen(true);
     MachineBackend.addLocalWSLMachine()
       .then((res) => {
         if (res.status !== "ok") {
           Setting.showMessage("error", `${i18next.t("machine:Failed to add local WSL machine")}: ${res.msg}`);
+          setWslDialogOpen(false);
           return;
         }
-        const machine = res.data?.machine ?? {};
-        const summary = `${res.data?.distro || machine.name} (${machine.username}@${machine.ip}:${machine.port})`;
-        // The endpoint is idempotent: re-running it refreshes an existing entry
-        // rather than failing, and the message says which happened.
-        Setting.showMessage(
-          "success",
-          res.data?.created === false
-            ? `${i18next.t("machine:Local WSL machine refreshed")}: ${summary}`
-            : `${i18next.t("machine:Local WSL machine added")}: ${summary}`
-        );
-        refresh();
+        setWslStatus(res.data ?? null);
+        wslRunningRef.current = Boolean(res.data?.running);
       })
-      .catch((error) => Setting.showMessage("error", `${i18next.t("machine:Failed to add local WSL machine")}: ${error.message}`))
-      .finally(() => setAddingLocalWSL(false));
+      .catch((error) => {
+        Setting.showMessage("error", `${i18next.t("machine:Failed to add local WSL machine")}: ${error.message}`);
+        setWslDialogOpen(false);
+      });
   }
 
   async function handleSubmit() {
@@ -216,7 +269,7 @@ function MachineListPage({account}) {
         toolbar={
           <>
             <SimpleTooltip title={i18next.t("machine:Add Local WSL - Tooltip")}>
-              <Button variant="outline" size="sm" loading={addingLocalWSL} onClick={addLocalWSL}>
+              <Button variant="outline" size="sm" loading={Boolean(wslStatus?.running)} onClick={addLocalWSL}>
                 <MonitorCog />
                 {i18next.t("machine:Add Local WSL")}
               </Button>
@@ -311,6 +364,8 @@ function MachineListPage({account}) {
           </Field>
         )}
       </FormDialog>
+
+      <LocalWSLEnrollDialog open={wslDialogOpen} onOpenChange={setWslDialogOpen} status={wslStatus} />
 
       <MachineNodeDeploySheet
         open={deployMachine !== null}

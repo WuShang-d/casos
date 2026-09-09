@@ -498,12 +498,14 @@
   },
   "machine": {
     "Add Local WSL": "Add Local WSL",
-    "Add Local WSL - Tooltip": "Enroll the WSL distro of this Windows host as a machine. CasOS starts sshd inside WSL and installs its own SSH key, so no IP address, port, username or password is needed. Run it again after a restart to refresh the WSL address.",
+    "Add Local WSL - Progress": "CasOS is preparing the WSL distribution of this Windows host, installing WSL and Ubuntu first when the host has none. This can take several minutes; you can close this and let it finish in the background.",
+    "Add Local WSL - Tooltip": "Enroll the WSL distro of this Windows host as a machine, installing WSL and Ubuntu first when the host has none. CasOS starts sshd inside WSL and installs its own SSH key, so no IP address, port, username or password is needed. Run it again after a restart to refresh the WSL address.",
     "Add Machine": "Add Machine",
     "Apiserver URL": "Apiserver URL",
     "Apiserver URL placeholder": "Default: CasOS advertise address",
     "Auth type": "Auth type",
     "Auth type - Tooltip": "Choose password authentication or an SSH private key.",
+    "Continue in background": "Continue in background",
     "Deploy Node": "Deploy Node",
     "Deploy worker node": "Deploy worker node",
     "Deployment failed": "Deployment failed",
@@ -541,6 +543,7 @@
     "SSH port": "SSH port",
     "SSH port - Tooltip": "The SSH port used to connect to the node, usually 22.",
     "Username - Tooltip": "The SSH user CasOS uses to connect to the node.",
+    "Waiting for the server to report progress": "Waiting for the server to report progress",
     "Worker Node": "Worker Node"
   },
   "monitor": {
