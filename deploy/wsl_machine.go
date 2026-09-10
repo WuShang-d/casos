@@ -50,9 +50,23 @@ func AddLocalWSLMachine(ctx context.Context, owner, distro string) (*LocalWSLMac
 		// friends register distros that cannot host a node, and one of them may
 		// well be the default.
 		if status, err := wsl.Detect(ctx); err == nil {
-			if selected := status.NodeDistro(); selected != nil {
+			if selected := recommendedWSLDistro(status, owner); selected != nil {
 				distro = selected.Name
 			}
+		}
+	}
+
+	// All WSL 2 distros share one network namespace, so a distro that had to
+	// move sshd off the configured port asks for the same port again rather
+	// than for whatever is free this time.
+	preferredPort := 0
+	if distro != "" {
+		existing, err := object.GetMachine(fmt.Sprintf("%s/%s", owner, localWSLMachineName(distro)))
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			preferredPort = existing.Port
 		}
 	}
 
@@ -63,7 +77,7 @@ func AddLocalWSLMachine(ctx context.Context, owner, distro string) (*LocalWSLMac
 
 	provisionCtx, cancel := context.WithTimeout(ctx, localWSLProvisionTimeout)
 	defer cancel()
-	provisioned, err := wsl.Provision(provisionCtx, distro, keyPair.PublicKey)
+	provisioned, err := wsl.Provision(provisionCtx, distro, keyPair.PublicKey, preferredPort)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +137,71 @@ func AddLocalWSLMachine(ctx context.Context, owner, distro string) (*LocalWSLMac
 		Created: created,
 		Sudo:    endpoint.sudo,
 	}, nil
+}
+
+// LocalWSLDistro is one distro of the local host, as offered for enrollment.
+type LocalWSLDistro struct {
+	wsl.Distro
+	Usable bool `json:"usable"`
+	// Recommended marks the distro an enrollment without a choice would pick.
+	Recommended bool   `json:"recommended"`
+	MachineName string `json:"machineName"`
+	Enrolled    bool   `json:"enrolled"`
+	Deployed    bool   `json:"deployed"`
+}
+
+// LocalWSLDistros lists the distros of the local host for the enrollment
+// picker. Detail explains an empty list, which enrollment fixes by installing.
+type LocalWSLDistros struct {
+	Distros []LocalWSLDistro `json:"distros"`
+	Detail  string           `json:"detail,omitempty"`
+}
+
+// ListLocalWSLDistros reports every distro of the local host, with the machine
+// each one is enrolled as, so a host with several can pick which to add.
+func ListLocalWSLDistros(ctx context.Context, owner string) (*LocalWSLDistros, error) {
+	status, err := wsl.Detect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	recommended := recommendedWSLDistro(status, owner)
+	result := &LocalWSLDistros{Distros: []LocalWSLDistro{}, Detail: status.Detail}
+	for _, distro := range status.Distros {
+		name := localWSLMachineName(distro.Name)
+		machine, err := object.GetMachine(fmt.Sprintf("%s/%s", owner, name))
+		if err != nil {
+			return nil, err
+		}
+		result.Distros = append(result.Distros, LocalWSLDistro{
+			Distro:      distro,
+			Usable:      distro.Usable(),
+			Recommended: recommended != nil && recommended.Name == distro.Name,
+			MachineName: name,
+			Enrolled:    machine != nil,
+			Deployed:    machine != nil && machine.Status == object.MachineStatusDeployed,
+		})
+	}
+	return result, nil
+}
+
+// recommendedWSLDistro is the distro to use when nobody chose one: the one that
+// already hosts the worker node, so a changed WSL default does not move the
+// node, and otherwise the one wsl.Status.NodeDistro picks.
+func recommendedWSLDistro(status *wsl.Status, owner string) *wsl.Distro {
+	if status == nil {
+		return nil
+	}
+	for i := range status.Distros {
+		distro := &status.Distros[i]
+		if !distro.Usable() {
+			continue
+		}
+		machine, err := object.GetMachine(fmt.Sprintf("%s/%s", owner, localWSLMachineName(distro.Name)))
+		if err == nil && machine != nil && machine.Status == object.MachineStatusDeployed {
+			return distro
+		}
+	}
+	return status.NodeDistro()
 }
 
 type localWSLEndpoint struct {

@@ -59,6 +59,9 @@ function MachineListPage({account}) {
   const [submitting, setSubmitting] = useState(false);
   const [wslStatus, setWslStatus] = useState(null);
   const [wslDialogOpen, setWslDialogOpen] = useState(false);
+  // Non-null while the dialog asks which of several distros to enroll.
+  const [wslDistros, setWslDistros] = useState(null);
+  const [wslChoice, setWslChoice] = useState("");
   const [deployMachine, setDeployMachine] = useState(null);
 
   const wslRunningRef = useRef(false);
@@ -127,12 +130,46 @@ function MachineListPage({account}) {
     }
   }
 
+  // A host with several usable distros asks which one to enroll; with one or
+  // none there is nothing to choose, and the server picks or installs one.
+  function addLocalWSL() {
+    if (wslStatus?.running) {
+      setWslDistros(null);
+      setWslDialogOpen(true);
+      return;
+    }
+    MachineBackend.getLocalWSLDistros()
+      .then((res) => {
+        if (res.status !== "ok") {
+          Setting.showMessage("error", `${i18next.t("machine:Failed to add local WSL machine")}: ${res.msg}`);
+          return;
+        }
+        const usable = (res.data?.distros ?? []).filter((distro) => distro.usable);
+        if (usable.length <= 1) {
+          startLocalWSL(usable[0]?.name ?? "");
+          return;
+        }
+        const preselected =
+          usable.find((distro) => distro.recommended && !distro.enrolled) ??
+          usable.find((distro) => !distro.enrolled) ??
+          usable.find((distro) => distro.recommended) ??
+          usable[0];
+        setWslChoice(preselected.name);
+        setWslDistros(usable);
+        setWslDialogOpen(true);
+      })
+      .catch((error) => {
+        Setting.showMessage("error", `${i18next.t("machine:Failed to add local WSL machine")}: ${error.message}`);
+      });
+  }
+
   // Enrolling is a background job on the server, because a host without WSL has
   // a distribution to install first. Starting it only opens the progress
   // dialog; the outcome arrives through the poll.
-  function addLocalWSL() {
+  function startLocalWSL(distro) {
+    setWslDistros(null);
     setWslDialogOpen(true);
-    MachineBackend.addLocalWSLMachine()
+    MachineBackend.addLocalWSLMachine(distro)
       .then((res) => {
         if (res.status !== "ok") {
           Setting.showMessage("error", `${i18next.t("machine:Failed to add local WSL machine")}: ${res.msg}`);
@@ -365,7 +402,15 @@ function MachineListPage({account}) {
         )}
       </FormDialog>
 
-      <LocalWSLEnrollDialog open={wslDialogOpen} onOpenChange={setWslDialogOpen} status={wslStatus} />
+      <LocalWSLEnrollDialog
+        open={wslDialogOpen}
+        onOpenChange={setWslDialogOpen}
+        status={wslStatus}
+        distros={wslDistros}
+        selected={wslChoice}
+        onSelectedChange={setWslChoice}
+        onStart={startLocalWSL}
+      />
 
       <MachineNodeDeploySheet
         open={deployMachine !== null}

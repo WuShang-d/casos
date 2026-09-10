@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ type LocalWSLEnrollment struct {
 	// Started is false only before the first enrollment of this server run.
 	Started     bool                   `json:"started"`
 	Running     bool                   `json:"running"`
+	Distro      string                 `json:"distro,omitempty"`
 	Logs        []string               `json:"logs"`
 	Error       string                 `json:"error,omitempty"`
 	Result      *LocalWSLMachineResult `json:"result,omitempty"`
@@ -34,11 +36,11 @@ var localWSLEnrollment = struct {
 	state LocalWSLEnrollment
 }{}
 
-// StartLocalWSLEnrollment enrolls the local WSL distro in the background,
-// installing WSL and its default distribution first when the host has nothing
-// usable. Calling it while a run is in flight reports that run instead of
-// starting a second one.
-func StartLocalWSLEnrollment(owner string) (LocalWSLEnrollment, error) {
+// StartLocalWSLEnrollment enrolls distro in the background. With no distro it
+// picks one, installing WSL and its default distribution first when the host
+// has nothing usable. Calling it while a run is in flight reports that run
+// instead of starting a second one.
+func StartLocalWSLEnrollment(owner, distro string) (LocalWSLEnrollment, error) {
 	if runtime.GOOS != "windows" {
 		return LocalWSLEnrollment{}, fmt.Errorf("local WSL enrollment is only available when CasOS runs on Windows")
 	}
@@ -48,9 +50,11 @@ func StartLocalWSLEnrollment(owner string) (LocalWSLEnrollment, error) {
 		defer localWSLEnrollment.mu.Unlock()
 		return localWSLEnrollment.state.snapshot(), nil
 	}
+	distro = strings.TrimSpace(distro)
 	localWSLEnrollment.state = LocalWSLEnrollment{
 		Started:     true,
 		Running:     true,
+		Distro:      distro,
 		StartedTime: nowStamp(),
 		UpdatedTime: nowStamp(),
 	}
@@ -59,7 +63,7 @@ func StartLocalWSLEnrollment(owner string) (LocalWSLEnrollment, error) {
 
 	// The server context, not the request one: the caller's browser must be
 	// free to navigate away from a half-hour install without cancelling it.
-	go runLocalWSLEnrollment(defaultService.contextSnapshot(), owner)
+	go runLocalWSLEnrollment(defaultService.contextSnapshot(), owner, distro)
 	return snapshot, nil
 }
 
@@ -70,7 +74,7 @@ func GetLocalWSLEnrollment() LocalWSLEnrollment {
 	return localWSLEnrollment.state.snapshot()
 }
 
-func runLocalWSLEnrollment(ctx context.Context, owner string) {
+func runLocalWSLEnrollment(ctx context.Context, owner, requested string) {
 	defer func() {
 		if v := recover(); v != nil {
 			finishLocalWSLEnrollment(nil, fmt.Errorf("local WSL enrollment panic: %v", v))
@@ -88,11 +92,12 @@ func runLocalWSLEnrollment(ctx context.Context, owner string) {
 	localNodeBootstrapMutex.Lock()
 	defer localNodeBootstrapMutex.Unlock()
 
-	distro, err := PrepareLocalWSLDistro(ctx, log)
+	distro, err := PrepareLocalWSLDistro(ctx, requested, log)
 	if err != nil {
 		finishLocalWSLEnrollment(nil, err)
 		return
 	}
+	setLocalWSLEnrollmentDistro(distro)
 	startWSLKeepAlive(ctx, distro)
 
 	log(fmt.Sprintf("Enrolling %s as a machine", distro))
@@ -114,6 +119,12 @@ func appendLocalWSLEnrollmentLog(line string) {
 		state.Logs = state.Logs[len(state.Logs)-localWSLEnrollmentLogLimit:]
 	}
 	state.UpdatedTime = nowStamp()
+}
+
+func setLocalWSLEnrollmentDistro(distro string) {
+	localWSLEnrollment.mu.Lock()
+	defer localWSLEnrollment.mu.Unlock()
+	localWSLEnrollment.state.Distro = distro
 }
 
 func finishLocalWSLEnrollment(result *LocalWSLMachineResult, err error) {

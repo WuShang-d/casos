@@ -40,8 +40,11 @@ const (
 // record they both write.
 var localNodeBootstrapMutex sync.Mutex
 
-// The keepalive outlives every bootstrap attempt, so it is started once.
-var wslKeepAliveOnce sync.Once
+// A keepalive outlives every bootstrap attempt, so each distro gets one once.
+var wslKeepAlives = struct {
+	mu      sync.Mutex
+	distros map[string]bool
+}{distros: map[string]bool{}}
 
 // StartLocalNodeBootstrap enrolls the CasOS host as a worker node in the
 // background. It is a no-op where that cannot work, so main can call it
@@ -174,7 +177,7 @@ func localNodeMachine(ctx context.Context) (*object.Machine, error) {
 }
 
 func localWSLNodeMachine(ctx context.Context) (*object.Machine, error) {
-	distro, err := PrepareLocalWSLDistro(ctx, func(line string) { logs.Info("wsl setup: %s", line) })
+	distro, err := PrepareLocalWSLDistro(ctx, "", func(line string) { logs.Info("wsl setup: %s", line) })
 	if err != nil {
 		return nil, err
 	}
@@ -191,11 +194,16 @@ func localWSLNodeMachine(ctx context.Context) (*object.Machine, error) {
 // takes the kubelet down with it, so without this the node goes NotReady a
 // minute after the deployment finishes.
 func startWSLKeepAlive(ctx context.Context, distro string) {
-	wslKeepAliveOnce.Do(func() {
-		go wsl.KeepAlive(ctx, distro,
-			func(line string) { logs.Info("wsl keepalive: %s", line) },
-			func() { reenrollWSLNode(ctx, distro) })
-	})
+	wslKeepAlives.mu.Lock()
+	defer wslKeepAlives.mu.Unlock()
+	key := strings.ToLower(strings.TrimSpace(distro))
+	if wslKeepAlives.distros[key] {
+		return
+	}
+	wslKeepAlives.distros[key] = true
+	go wsl.KeepAlive(ctx, distro,
+		func(line string) { logs.Info("wsl keepalive: %s", line) },
+		func() { reenrollWSLNode(ctx, distro) })
 }
 
 // reenrollWSLNode refreshes what a restart of the distro invalidates. The node
@@ -211,17 +219,25 @@ func reenrollWSLNode(ctx context.Context, distro string) {
 		logs.Warning("automatic node setup: re-enrolling %s after its restart failed: %v", distro, err)
 		return
 	}
+	if result.Machine.Status != object.MachineStatusDeployed {
+		return
+	}
 	if err = ensureWindowsWSLClusterRoutes(ctx, result.Machine.Ip); err != nil {
 		logs.Warning("automatic node setup: %v", err)
 	}
 }
 
-// PrepareLocalWSLDistro returns the distro to enroll as a worker node, ready to
-// be enrolled: WSL and a distribution are installed when the host has nothing
-// usable, and the distro is made to boot with systemd. Progress goes to log,
-// because installing a distribution downloads its image and takes minutes.
-func PrepareLocalWSLDistro(ctx context.Context, log func(string)) (string, error) {
-	distro, err := localWSLNodeDistro(ctx, log)
+// PrepareLocalWSLDistro returns distro ready to be enrolled, made to boot with
+// systemd. With no distro it picks the one to host the worker node, installing
+// WSL and a distribution when the host has nothing usable. Progress goes to
+// log, because installing a distribution downloads its image and takes minutes.
+func PrepareLocalWSLDistro(ctx context.Context, distro string, log func(string)) (string, error) {
+	var err error
+	if distro = strings.TrimSpace(distro); distro != "" {
+		distro, err = requestedWSLDistro(ctx, distro, log)
+	} else {
+		distro, err = localWSLNodeDistro(ctx, log)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -238,7 +254,7 @@ func localWSLNodeDistro(ctx context.Context, log func(string)) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if selected := status.NodeDistro(); selected != nil {
+	if selected := recommendedWSLDistro(status, "admin"); selected != nil {
 		log(fmt.Sprintf("Using WSL distribution %s", selected.Name))
 		return selected.Name, nil
 	}
@@ -253,6 +269,26 @@ func localWSLNodeDistro(ctx context.Context, log func(string)) (string, error) {
 		return "", fmt.Errorf("WSL was installed but no usable distribution is registered yet, restart Windows to finish enabling WSL")
 	}
 	log(fmt.Sprintf("Installed WSL distribution %s", selected.Name))
+	return selected.Name, nil
+}
+
+// requestedWSLDistro checks the distro someone picked. Nothing is installed for
+// it: a name that is not registered is a mistake, not a missing WSL.
+func requestedWSLDistro(ctx context.Context, name string, log func(string)) (string, error) {
+	status, err := wsl.Detect(ctx)
+	if err != nil {
+		return "", err
+	}
+	selected := status.Find(name)
+	switch {
+	case selected == nil:
+		return "", fmt.Errorf("WSL distribution %s is not registered on this host", name)
+	case selected.Version < 2:
+		return "", fmt.Errorf("WSL distribution %s runs on WSL 1, which cannot run systemd: convert it with \"wsl --set-version %s 2\" first", selected.Name, selected.Name)
+	case !selected.Usable():
+		return "", fmt.Errorf("WSL distribution %s belongs to another product and cannot be enrolled as a machine", selected.Name)
+	}
+	log(fmt.Sprintf("Using WSL distribution %s", selected.Name))
 	return selected.Name, nil
 }
 

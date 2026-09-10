@@ -4,16 +4,34 @@ import {Button} from "@/components/ui/button";
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {MessageAlert} from "@/components/ui/alert";
 import {AiDots} from "@/components/shared/loading";
+import {Field} from "@/components/shared/form-dialog";
+import {SimpleSelect} from "@/components/shared/simple-select";
+
+function distroLabel(distro) {
+  const notes = [];
+  if (distro.default) {
+    notes.push(i18next.t("machine:Default WSL distribution"));
+  }
+  if (distro.deployed) {
+    notes.push(i18next.t("machine:Hosts the worker node"));
+  } else if (distro.enrolled) {
+    notes.push(`${i18next.t("machine:Enrolled as")} ${distro.machineName}`);
+  }
+  return notes.length > 0 ? `${distro.name} (${notes.join(", ")})` : distro.name;
+}
 
 /**
- * Progress of the background enrollment of the local WSL distro. A host without
- * WSL has a distribution to download and register first, which takes minutes,
- * so this shows the server's own progress lines rather than a spinner that says
- * nothing. Closing it does not stop the job.
+ * Enrollment of a local WSL distro. With `distros` set, the host has several
+ * and the dialog first asks which one to enroll. Otherwise it shows the
+ * progress of the background job: a host without WSL has a distribution to
+ * download and register first, which takes minutes, so this shows the server's
+ * own progress lines rather than a spinner that says nothing. Closing it does
+ * not stop the job.
  */
-export function LocalWSLEnrollDialog({open, onOpenChange, status}) {
+export function LocalWSLEnrollDialog({open, onOpenChange, status, distros, selected, onSelectedChange, onStart}) {
   const logRef = useRef(null);
   const logs = status?.logs ?? [];
+  const choosing = Array.isArray(distros);
 
   useEffect(() => {
     if (logRef.current) {
@@ -23,6 +41,38 @@ export function LocalWSLEnrollDialog({open, onOpenChange, status}) {
 
   const machine = status?.result?.machine;
   const done = status?.started && !status?.running;
+
+  if (choosing) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{i18next.t("machine:Add Local WSL")}</DialogTitle>
+            <DialogDescription>{i18next.t("machine:Add Local WSL - Choose")}</DialogDescription>
+          </DialogHeader>
+
+          <Field label={i18next.t("machine:WSL distribution")} htmlFor="local-wsl-distro">
+            <SimpleSelect
+              id="local-wsl-distro"
+              value={selected}
+              onChange={onSelectedChange}
+              options={distros.map((distro) => ({label: distroLabel(distro), value: distro.name}))}
+            />
+          </Field>
+          <p className="text-muted-foreground text-sm">{i18next.t("machine:Add Local WSL - Shared network")}</p>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange?.(false)}>
+              {i18next.t("general:Cancel")}
+            </Button>
+            <Button data-testid="local-wsl-start" disabled={!selected} onClick={() => onStart?.(selected)}>
+              {i18next.t("machine:Add Local WSL")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

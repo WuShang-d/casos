@@ -35,8 +35,16 @@ export function addMachine(machine) {
   }).then(res => Setting.handleFetchResponse(res));
 }
 
-export function addLocalWSLMachine() {
-  return fetch(`${Setting.ServerUrl}/api/add-local-wsl-machine`, {
+export function getLocalWSLDistros() {
+  return fetch(`${Setting.ServerUrl}/api/get-local-wsl-distros`, {
+    method: "GET",
+    credentials: "include",
+    headers: {"Accept-Language": Setting.getAcceptLanguage()},
+  }).then(res => Setting.handleFetchResponse(res));
+}
+
+export function addLocalWSLMachine(distro = "") {
+  return fetch(`${Setting.ServerUrl}/api/add-local-wsl-machine?distro=${encodeURIComponent(distro)}`, {
     method: "POST",
     credentials: "include",
     headers: {"Accept-Language": Setting.getAcceptLanguage()},

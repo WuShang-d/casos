@@ -4,8 +4,26 @@ import (
 	"github.com/casosorg/casos/deploy"
 )
 
-// AddLocalWSLMachine starts enrolling the WSL distro of the local Windows host
-// as a machine, without asking the user for any connection detail. It runs in
+// GetLocalWSLDistros lists the WSL distros of the local Windows host, so a host
+// with several can choose which one to enroll.
+// @router /api/get-local-wsl-distros [get]
+func (c *ApiController) GetLocalWSLDistros() {
+	if c.RequireAdmin() {
+		return
+	}
+
+	distros, err := deploy.ListLocalWSLDistros(c.Ctx.Request.Context(), "admin")
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	c.ResponseOk(distros)
+}
+
+// AddLocalWSLMachine starts enrolling a WSL distro of the local Windows host as
+// a machine, without asking the user for any connection detail. The optional
+// distro parameter picks one; without it CasOS picks one itself. It runs in
 // the background because a host without WSL has a distribution to install
 // first, so the caller polls GetLocalWSLMachineStatus for progress.
 // @router /api/add-local-wsl-machine [post]
@@ -14,7 +32,7 @@ func (c *ApiController) AddLocalWSLMachine() {
 		return
 	}
 
-	status, err := deploy.StartLocalWSLEnrollment("admin")
+	status, err := deploy.StartLocalWSLEnrollment("admin", c.GetString("distro"))
 	if err != nil {
 		c.ResponseError(err.Error())
 		return

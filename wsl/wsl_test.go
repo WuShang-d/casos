@@ -68,7 +68,7 @@ func TestDecodeOutput(t *testing.T) {
 }
 
 func TestProvisionScriptQuotesValues(t *testing.T) {
-	script := provisionScript("ssh-rsa AAAA'injected", "ubuntu")
+	script := provisionScript("ssh-rsa AAAA'injected", "ubuntu", 0)
 	if strings.Contains(script, "AAAA'injected'") {
 		t.Error("single quote in the public key was not escaped")
 	}

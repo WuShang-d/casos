@@ -41,8 +41,10 @@ func Available() error {
 
 // Provision makes sure sshd runs inside distro and authorizes publicKey for
 // both the distro's login user and root. An empty distro means the default one.
-// It returns the addresses the caller can use to reach the distro over SSH.
-func Provision(ctx context.Context, distro, publicKey string) (*ProvisionResult, error) {
+// preferredPort, when not zero, is the port the distro was reached on before,
+// kept when no other distro has taken it since. It returns the addresses the
+// caller can use to reach the distro over SSH.
+func Provision(ctx context.Context, distro, publicKey string, preferredPort int) (*ProvisionResult, error) {
 	if err := Available(); err != nil {
 		return nil, err
 	}
@@ -56,7 +58,7 @@ func Provision(ctx context.Context, distro, publicKey string) (*ProvisionResult,
 		return nil, err
 	}
 
-	stdout, stderr, err := run(ctx, distro, true, provisionScript(publicKey, defaultUser))
+	stdout, stderr, err := run(ctx, distro, true, provisionScript(publicKey, defaultUser, preferredPort))
 	result, parseErr := parseProvisionOutput(stdout)
 	if err != nil {
 		if result != nil && result.err != "" {
@@ -156,10 +158,15 @@ func parseProvisionOutput(stdout string) (*provisionOutput, error) {
 
 // provisionScript is executed as root inside the default WSL distro. It is fed
 // through stdin so no value has to survive Windows command line quoting.
-func provisionScript(publicKey, defaultUser string) string {
+func provisionScript(publicKey, defaultUser string, preferredPort int) string {
 	var b strings.Builder
 	b.WriteString("PUBKEY=" + shellSingleQuote(publicKey) + "\n")
 	b.WriteString("DEFAULT_USER=" + shellSingleQuote(defaultUser) + "\n")
+	if preferredPort > 0 && preferredPort < 65536 {
+		b.WriteString("PREFERRED_PORT=" + strconv.Itoa(preferredPort) + "\n")
+	} else {
+		b.WriteString("PREFERRED_PORT=\n")
+	}
 	b.WriteString(`
 if [ "$(id -u)" != 0 ]; then
   echo "CASOS_ERROR=the WSL provisioning script did not run as root"
@@ -202,9 +209,53 @@ fi
 mkdir -p /run/sshd /var/run/sshd >/dev/null 2>&1
 ssh-keygen -A >/dev/null 2>&1
 
-PORT=$(awk '$1 == "Port" && $2 ~ /^[0-9]+$/ { print $2; exit }' /etc/ssh/sshd_config 2>/dev/null)
+CONFIG_PORT=$(awk '$1 == "Port" && $2 ~ /^[0-9]+$/ { print $2; exit }' /etc/ssh/sshd_config 2>/dev/null)
+if [ -z "$CONFIG_PORT" ]; then
+  CONFIG_PORT=22
+fi
+
+# Every WSL 2 distro shares one network namespace but has a PID namespace of
+# its own, so a listening socket no process here holds belongs to another
+# distro, whose sshd would answer instead of ours. Prints free, self or other.
+port_owner() {
+  hex=$(printf '%04X' "$1")
+  inodes=$(cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk -v suffix=":$hex" '$4 == "0A" && substr($2, length($2) - 4) == suffix { print $10 }')
+  if [ -z "$inodes" ]; then
+    echo free
+    return
+  fi
+  links=$(ls -l /proc/[0-9]*/fd/ 2>/dev/null)
+  for inode in $inodes; do
+    case "$links" in
+      *"socket:[$inode]"*)
+        echo self
+        return
+        ;;
+    esac
+  done
+  echo other
+}
+
+PORT=""
+for candidate in $PREFERRED_PORT $CONFIG_PORT; do
+  if [ "$(port_owner "$candidate")" != other ]; then
+    PORT=$candidate
+    break
+  fi
+done
 if [ -z "$PORT" ]; then
-  PORT=22
+  candidate=2222
+  while [ "$candidate" -lt 2322 ]; do
+    if [ "$(port_owner "$candidate")" != other ]; then
+      PORT=$candidate
+      break
+    fi
+    candidate=$((candidate + 1))
+  done
+fi
+if [ -z "$PORT" ]; then
+  echo "CASOS_ERROR=other WSL distributions hold port $CONFIG_PORT and every port from 2222 to 2321, so sshd has nowhere to listen"
+  exit 1
 fi
 
 install_key() {
@@ -233,23 +284,32 @@ if [ -n "$DEFAULT_USER" ] && [ "$DEFAULT_USER" != root ]; then
   install_key "$DEFAULT_USER"
 fi
 
-started=0
-if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
-  for svc in ssh sshd; do
-    if systemctl cat "$svc.service" >/dev/null 2>&1; then
-      systemctl enable "$svc" >/dev/null 2>&1
-      if systemctl restart "$svc" >/dev/null 2>&1; then
-        started=1
-        break
+if [ "$PORT" = "$CONFIG_PORT" ]; then
+  started=0
+  if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+    for svc in ssh sshd; do
+      if systemctl cat "$svc.service" >/dev/null 2>&1; then
+        systemctl enable "$svc" >/dev/null 2>&1
+        if systemctl restart "$svc" >/dev/null 2>&1; then
+          started=1
+          break
+        fi
       fi
+    done
+  fi
+  if [ "$started" != 1 ]; then
+    # sshd may already be running from an earlier enrollment; starting a second
+    # one simply fails and the caller verifies reachability over SSH anyway.
+    if ! out=$("$SSHD" 2>&1); then
+      echo "CASOS_WARN=could not start sshd: $(printf '%s' "$out" | tr '\n' ' ')"
     fi
-  done
-fi
-if [ "$started" != 1 ]; then
-  # sshd may already be running from an earlier enrollment; starting a second
-  # one simply fails and the caller verifies reachability over SSH anyway.
-  if ! out=$("$SSHD" 2>&1); then
-    echo "CASOS_WARN=could not start sshd: $(printf '%s' "$out" | tr '\n' ' ')"
+  fi
+elif [ "$(port_owner "$PORT")" = free ]; then
+  # Another distro holds the configured port. The distro's own ssh service
+  # would keep losing that race, so CasOS runs an sshd of its own on a port
+  # nobody else uses, and starts it again on every re-enrollment.
+  if ! out=$("$SSHD" -p "$PORT" 2>&1); then
+    echo "CASOS_WARN=could not start sshd on port $PORT: $(printf '%s' "$out" | tr '\n' ' ')"
   fi
 fi
 

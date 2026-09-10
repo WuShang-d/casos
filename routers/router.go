@@ -131,6 +131,7 @@ func InitAPI() {
 	beego.Router("/api/get-global-machines", &controllers.ApiController{}, "GET:GetGlobalMachines")
 	beego.Router("/api/get-machine", &controllers.ApiController{}, "GET:GetMachine")
 	beego.Router("/api/add-machine", &controllers.ApiController{}, "POST:AddMachine")
+	beego.Router("/api/get-local-wsl-distros", &controllers.ApiController{}, "GET:GetLocalWSLDistros")
 	beego.Router("/api/add-local-wsl-machine", &controllers.ApiController{}, "POST:AddLocalWSLMachine")
 	beego.Router("/api/get-local-wsl-machine-status", &controllers.ApiController{}, "GET:GetLocalWSLMachineStatus")
 	beego.Router("/api/update-machine", &controllers.ApiController{}, "POST:UpdateMachine")

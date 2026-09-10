@@ -106,6 +106,21 @@ func (s *Status) NodeDistro() *Distro {
 	return nil
 }
 
+// Find returns the registered distro called name. WSL treats distro names case
+// insensitively, so this does too.
+func (s *Status) Find(name string) *Distro {
+	if s == nil {
+		return nil
+	}
+	name = strings.TrimSpace(name)
+	for i := range s.Distros {
+		if strings.EqualFold(s.Distros[i].Name, name) {
+			return &s.Distros[i]
+		}
+	}
+	return nil
+}
+
 // Detect reports what WSL looks like on this host. A host without WSL is not an
 // error: it is the state Install exists to fix.
 func Detect(ctx context.Context) (*Status, error) {
@@ -312,14 +327,21 @@ func EnsureSystemd(ctx context.Context, distro string, log func(string)) (bool, 
 		return false, fmt.Errorf("enable systemd in %s: %s", displayDistro(distro), summarize(stdout, stderr))
 	}
 
-	// systemd only takes over at boot, and WSL boots a distro once per session,
-	// so the whole WSL session has to be torn down. This also stops any other
-	// running distro, including the ones Docker Desktop uses.
-	log("Restarting WSL so systemd becomes PID 1 (this stops all running WSL distributions)")
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shortCommandTimeout)
-	defer shutdownCancel()
-	if _, stderr, err := output(shutdownCtx, "--shutdown"); err != nil {
-		return false, fmt.Errorf("wsl --shutdown: %w: %s", err, summarize(stderr))
+	// systemd only takes over at boot. /etc/wsl.conf is read per distro, so
+	// terminating this one is enough, and the other distros on the host, which
+	// may be enrolled machines or worker nodes themselves, keep running.
+	stopCtx, stopCancel := context.WithTimeout(ctx, shortCommandTimeout)
+	defer stopCancel()
+	if name := strings.TrimSpace(distro); name != "" {
+		log(fmt.Sprintf("Restarting %s so systemd becomes PID 1", name))
+		if _, stderr, err := output(stopCtx, "--terminate", name); err != nil {
+			return false, fmt.Errorf("wsl --terminate %s: %w: %s", name, err, summarize(stderr))
+		}
+	} else {
+		log("Restarting WSL so systemd becomes PID 1 (this stops all running WSL distributions)")
+		if _, stderr, err := output(stopCtx, "--shutdown"); err != nil {
+			return false, fmt.Errorf("wsl --shutdown: %w: %s", err, summarize(stderr))
+		}
 	}
 
 	log("Waiting for systemd to come up")
