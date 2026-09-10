@@ -64,6 +64,8 @@ const ROUTES = [
 const SIMPLE_MODE_ROUTES = [
   "/simple",
   "/simple/app-store",
+  "/simple/app-store/templates",
+  "/simple/app-store/dockerhub",
   "/simple/apps",
   "/simple/launchpad",
   "/simple/launchpad/new",

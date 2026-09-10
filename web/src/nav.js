@@ -176,6 +176,7 @@ export function navKeyForPath(pathname) {
 const MODE_COUNTERPARTS = [
   ["/dashboard", "/simple"],
   ["/app-store", "/simple/app-store"],
+  ["/templates", "/simple/templates"],
   ["/helm-releases", "/simple/apps"],
   ["/launchpad", "/simple/launchpad"],
   ["/databases", "/simple/databases"],

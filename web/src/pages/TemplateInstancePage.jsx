@@ -67,7 +67,7 @@ function TemplateInstancePage(props) {
   function remove() {
     runAction(TemplateBackend.deleteTemplateInstance({namespace, name, deleteData}), {
       successMessage: i18next.t("template:App removed"),
-      onSuccess: () => history.push("/helm-releases"),
+      onSuccess: () => history.push(resolvePath("/helm-releases")),
     });
   }
 
@@ -80,7 +80,7 @@ function TemplateInstancePage(props) {
       <PageContainer>
         <MessageAlert title={error ?? i18next.t("launchpad:App not found")} />
         <div>
-          <Button variant="outline" onClick={() => history.push("/helm-releases")}>
+          <Button variant="outline" onClick={() => history.push(resolvePath("/helm-releases"))}>
             <ArrowLeft />
             {i18next.t("launchpad:Back")}
           </Button>
@@ -113,7 +113,7 @@ function TemplateInstancePage(props) {
         description={`${instance.template} · ${instance.namespace}/${instance.name}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => history.push("/helm-releases")}>
+            <Button variant="outline" onClick={() => history.push(resolvePath("/helm-releases"))}>
               <ArrowLeft />
               {i18next.t("launchpad:Back")}
             </Button>

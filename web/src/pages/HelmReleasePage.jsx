@@ -386,7 +386,7 @@ export default function HelmReleasePage() {
 
   function openLogs(release) {
     if (release.kind === "template") {
-      router.push(`/templates/instances/${release.namespace}/${release.name}`);
+      router.push(resolvePath(`/templates/instances/${release.namespace}/${release.name}`));
       return;
     }
     if (release.kind === "image") {
@@ -401,7 +401,7 @@ export default function HelmReleasePage() {
 
   function openUpgrade(release) {
     if (release.kind === "template") {
-      router.push(`/templates/instances/${release.namespace}/${release.name}`);
+      router.push(resolvePath(`/templates/instances/${release.namespace}/${release.name}`));
       return;
     }
     if (release.kind === "image") {
@@ -551,7 +551,7 @@ export default function HelmReleasePage() {
               <Button
                 variant="outline"
                 size="icon-sm"
-                onClick={() => router.push(`/templates/instances/${release.namespace}/${release.name}`)}
+                onClick={() => router.push(resolvePath(`/templates/instances/${release.namespace}/${release.name}`))}
                 aria-label="Details"
               >
                 <ArrowUpRight className="size-4" />

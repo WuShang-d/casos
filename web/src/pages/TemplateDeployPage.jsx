@@ -17,6 +17,7 @@ import {SimpleSelect} from "@/components/shared/simple-select";
 import {AppIcon} from "@/components/shared/app-icon";
 import {cn} from "@/lib/utils";
 import {runAction, useResource} from "@/hooks/use-resource";
+import {useUiMode} from "@/hooks/use-ui-mode";
 import {useWorkspace} from "@/hooks/use-workspace";
 
 function isSecretField(key) {
@@ -34,6 +35,7 @@ function isSecretField(key) {
 function TemplateDeployPage(props) {
   useTranslation();
   const {history, match} = props;
+  const {resolvePath} = useUiMode();
   const templateName = match.params.name;
 
   const {workspace} = useWorkspace();
@@ -105,7 +107,7 @@ function TemplateDeployPage(props) {
       TemplateBackend.deployTemplate({name: templateName, namespace, domain, inputs: values}),
       {
         successMessage: i18next.t("launchpad:App deployed"),
-        onSuccess: (res) => history.push(`/templates/instances/${res.data.namespace}/${res.data.name}`),
+        onSuccess: (res) => history.push(resolvePath(`/templates/instances/${res.data.namespace}/${res.data.name}`)),
       }
     ).finally(() => setSubmitting(false));
   }
@@ -119,7 +121,7 @@ function TemplateDeployPage(props) {
       <PageContainer>
         <MessageAlert title={error ?? i18next.t("template:Template not found")} />
         <div>
-          <Button variant="outline" onClick={() => history.push("/app-store/templates")}>
+          <Button variant="outline" onClick={() => history.push(resolvePath("/app-store/templates"))}>
             <ArrowLeft />
             {i18next.t("launchpad:Back")}
           </Button>
@@ -140,7 +142,7 @@ function TemplateDeployPage(props) {
         description={detail.description}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => history.push("/app-store/templates")}>
+            <Button variant="outline" onClick={() => history.push(resolvePath("/app-store/templates"))}>
               <ArrowLeft />
               {i18next.t("launchpad:Back")}
             </Button>

@@ -1,9 +1,9 @@
 /**
- * The apps simple mode offers. Every entry is a chart the backend has an
+ * The apps simple mode recommends. Every entry is a chart the backend has an
  * install adapter for (see store/adapters.go), which is what makes them work
  * without anyone editing values.yaml — that, rather than popularity, is the
- * bar for being listed here. Anything else is still installable from the full
- * App Store in advanced mode.
+ * bar for being listed here. Anything else is one tab over, in the full
+ * catalogues both modes browse.
  *
  * `description` doubles as the i18next key in the `simple` namespace.
  */
@@ -20,7 +20,7 @@ function chartIcon(imageId) {
 }
 
 export const APP_CATEGORIES = [
-  {key: "all", label: "simple:Recommended"},
+  {key: "all", label: "general:All"},
   {key: "files", label: "simple:Files and media"},
   {key: "website", label: "simple:Websites"},
   {key: "database", label: "database:Databases"},

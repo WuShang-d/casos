@@ -141,6 +141,9 @@ export function AppRoutes({account, accountUpdatedAt, onOpenAccount, onUpdateSit
           render={(props) => <DashboardPage account={account} accountUpdatedAt={accountUpdatedAt} onOpenAccount={onOpenAccount} {...props} />}
         />
         <Route exact path="/simple/app-store" component={AppStorePage} />
+        <Route exact path="/simple/app-store/:sourceSlug" component={AppStorePage} />
+        <Route exact path="/simple/templates/instances/:namespace/:name" component={TemplateInstancePage} />
+        <Route exact path="/simple/templates/:name" component={TemplateDeployPage} />
         <Route exact path="/simple/apps" component={HelmReleasePage} />
         <Route exact path="/simple/launchpad" component={LaunchpadPage} />
         <Route exact path="/simple/launchpad/new" component={LaunchpadEditPage} />

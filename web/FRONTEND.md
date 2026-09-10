@@ -239,6 +239,14 @@ and everything installed lands in the same **Installed Apps** list, whichever
 way it got there. `/templates` redirects to `/app-store/templates` so older
 links keep working.
 
+Both modes browse the same catalogues — `hooks/use-app-catalog.js` is the one
+place a source is fetched, paged and normalised. Simple mode opens on a curated
+list (`lib/appCatalog.js`) and offers Templates, ArtifactHub and Docker Hub as
+tabs at `/simple/app-store/<source>`; what stays advanced-only is the repository
+sidebar, custom repos and the Bitnami/Rancher presets. A simple-mode URL naming
+one of those falls back to the curated list. The template pages have `/simple`
+routes too, so installing from the market never leaves simple mode.
+
 The market reads the **sealos template repository**
 (`labring-actions/templates`) in its own format, so an app published for that
 store deploys here unchanged. casos pulls the repository as a tarball over
@@ -251,6 +259,7 @@ HTTPS and keeps one file per template — no git binary, a few megabytes on disk
 | `controllers/template_apply.go` | Applying whatever the template names, through the dynamic client, plus the two translations below |
 | `controllers/template.go` | The endpoints, and the instance record |
 | `pages/AppStorePage.jsx` | The market grid, as one of the store's sources |
+| `hooks/use-app-catalog.js` | Fetching and normalising every source, shared by both modes' stores |
 | `pages/TemplateDeployPage.jsx` | The form a template declares, with the rendered manifests beside it |
 | `pages/TemplateInstancePage.jsx` | One installed app: address, databases, what it created, what is missing |
 
