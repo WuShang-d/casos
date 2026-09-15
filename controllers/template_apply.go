@@ -258,6 +258,11 @@ var kubeBlocksEngines = map[string]string{
 	"redis":          "redis",
 }
 
+var sealosDefaultDatabaseName = map[string]string{
+	"mysql":      "mydb",
+	"postgresql": "postgres",
+}
+
 // engineVersionFromRef reads "postgresql-16.4.0" or "ac-mysql-8.0.30" and
 // picks the closest version casos offers, so a template that asked for
 // PostgreSQL 16 does not silently get 17.
@@ -300,6 +305,7 @@ func (a *templateApplier) applyDatabase(item *unstructured.Unstructured) (string
 		Name:      item.GetName(),
 		Engine:    engine.Key,
 		Version:   engineVersionFromRef(engine, versionRef),
+		Database:  sealosDefaultDatabaseName[engine.Key],
 	}
 
 	components, _, _ := unstructured.NestedSlice(item.Object, "spec", "componentSpecs")
