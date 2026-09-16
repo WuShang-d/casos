@@ -379,6 +379,47 @@ func (a *templateApplier) writeConnCredential(name string, credentials databaseC
 	return err
 }
 
+// statefulSetClaims names the PVCs minted from volumeClaimTemplates: they
+// outlive their StatefulSet, so call this before deleteApplied removes it.
+func (a *templateApplier) statefulSetClaims(ctx context.Context, objects []appliedObject) []appliedObject {
+	claims := []appliedObject{}
+	for _, item := range objects {
+		if item.Kind != "StatefulSet" || item.Namespace == "" {
+			continue
+		}
+		gvr := schema.GroupVersionResource{Group: item.Group, Version: item.Version, Resource: item.Resource}
+		set, err := a.dynamic.Resource(gvr).Namespace(item.Namespace).Get(ctx, item.Name, metav1.GetOptions{})
+		if err != nil {
+			continue
+		}
+		replicas, found, _ := unstructured.NestedInt64(set.Object, "spec", "replicas")
+		if !found || replicas < 1 {
+			replicas = 1
+		}
+		templates, _, _ := unstructured.NestedSlice(set.Object, "spec", "volumeClaimTemplates")
+		for _, entry := range templates {
+			claim, ok := entry.(map[string]any)
+			if !ok {
+				continue
+			}
+			claimName, _, _ := unstructured.NestedString(claim, "metadata", "name")
+			if claimName == "" {
+				continue
+			}
+			for ordinal := int64(0); ordinal < replicas; ordinal++ {
+				claims = append(claims, appliedObject{
+					Version:   "v1",
+					Resource:  "persistentvolumeclaims",
+					Kind:      "PersistentVolumeClaim",
+					Namespace: item.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%d", claimName, item.Name, ordinal),
+				})
+			}
+		}
+	}
+	return claims
+}
+
 // deleteApplied removes what an instance created, newest first so that an
 // object is never left pointing at one that is already gone.
 func (a *templateApplier) deleteApplied(ctx context.Context, objects []appliedObject) []string {

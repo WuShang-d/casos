@@ -660,7 +660,13 @@ func (c *ApiController) DeleteTemplateInstance() {
 		c.ResponseError(err.Error())
 		return
 	}
+	var claims []appliedObject
+	if req.DeleteData {
+		claims = applier.statefulSetClaims(c.Ctx.Request.Context(), instance.Objects)
+	}
+
 	failures := applier.deleteApplied(c.Ctx.Request.Context(), instance.Objects)
+	failures = append(failures, applier.deleteApplied(c.Ctx.Request.Context(), claims)...)
 
 	for _, database := range instance.Databases {
 		failures = append(failures, deleteDatabaseObjects(cfg, req.Namespace, database, req.DeleteData)...)
