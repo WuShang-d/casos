@@ -206,6 +206,17 @@ func (a *templateApplier) applyObject(ctx context.Context, item *unstructured.Un
 		labels[key] = value
 	}
 	item.SetLabels(labels)
+	// Pods carry the instance label too, so the instance can say whether its
+	// app is up. A selector names only the template's own labels, so adding
+	// to the Pod template never breaks it.
+	if _, found, _ := unstructured.NestedMap(item.Object, "spec", "template"); found {
+		podLabels, _, _ := unstructured.NestedStringMap(item.Object, "spec", "template", "metadata", "labels")
+		if podLabels == nil {
+			podLabels = map[string]string{}
+		}
+		podLabels[templateInstanceLabel] = a.instance
+		_ = unstructured.SetNestedStringMap(item.Object, podLabels, "spec", "template", "metadata", "labels")
+	}
 
 	namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
 	if namespaced {
@@ -431,7 +442,9 @@ func (a *templateApplier) deleteApplied(ctx context.Context, objects []appliedOb
 		if item.Namespace != "" {
 			resourceInterface = a.dynamic.Resource(gvr).Namespace(item.Namespace)
 		}
-		if err := resourceInterface.Delete(ctx, item.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		// A Job left to the API's default would orphan its Pods.
+		propagation := metav1.DeletePropagationBackground
+		if err := resourceInterface.Delete(ctx, item.Name, metav1.DeleteOptions{PropagationPolicy: &propagation}); err != nil && !errors.IsNotFound(err) {
 			failures = append(failures, fmt.Sprintf("%s %s (%v)", item.Kind, item.Name, err))
 		}
 	}

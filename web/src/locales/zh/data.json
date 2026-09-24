@@ -702,6 +702,24 @@
     "subject placeholder": "如：alice 或 role:admin",
     "user placeholder": "如：alice"
   },
+  "privateAi": {
+    "CPU only — slower": "仅 CPU（较慢）",
+    "Downloading the app — a few GB, only the first time": "正在下载应用（几 GB，仅首次需要）",
+    "Downloading the model {{model}}": "正在下载模型 {{model}}",
+    "Install Private AI": "安装私有 AI",
+    "Manage": "管理",
+    "Model": "模型",
+    "More options": "更多选项",
+    "Preparing": "准备中",
+    "Preparing the model": "正在准备模型",
+    "Private AI": "私有 AI",
+    "Ready": "已就绪",
+    "Something went wrong: {{reason}}": "出现问题：{{reason}}",
+    "Start chatting": "开始对话",
+    "Starting": "正在启动",
+    "Your own ChatGPT on this machine in one click: Ollama and Open WebUI, set up and connected, on your GPU when you have one.": "一键在本机拥有你自己的 ChatGPT：自动装好并连通 Ollama 和 Open WebUI，有显卡时自动用显卡加速。",
+    "Your own ChatGPT, running on this machine. Chats and files never leave it.": "你自己的 ChatGPT，运行在这台电脑上，对话和文件都不会离开本机。"
+  },
   "provider": {
     "Client ID": "客户端ID",
     "Client ID - Tooltip": "在OAuth提供者处注册应用时获得的客户端ID",

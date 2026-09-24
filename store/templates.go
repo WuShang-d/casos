@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -112,6 +113,30 @@ type TemplateRepoStatus struct {
 	Count     int    `json:"count"`
 	UpdatedAt string `json:"updatedAt"`
 }
+
+// Built-in templates are the apps casos writes itself. They ship in the binary,
+// so a market sync never removes them, and one takes the place of a market
+// template with the same name.
+//
+//go:embed builtin/*.yaml
+var builtinTemplateFiles embed.FS
+
+var builtinTemplates = sync.OnceValue(func() map[string]Template {
+	templates := map[string]Template{}
+	entries, _ := builtinTemplateFiles.ReadDir("builtin")
+	for _, entry := range entries {
+		content, err := builtinTemplateFiles.ReadFile("builtin/" + entry.Name())
+		if err != nil {
+			panic(err)
+		}
+		parsed, err := parseTemplateFile(strings.TrimSuffix(entry.Name(), ".yaml"), content)
+		if err != nil {
+			panic(err)
+		}
+		templates[parsed.Name] = parsed
+	}
+	return templates
+})
 
 func TemplatesDir(dataDir string) string {
 	return filepath.Join(dataDir, "templates")
@@ -322,14 +347,15 @@ func loadTemplateFile(path, name string) (Template, error) {
 // broken template upstream must not empty the store.
 func LoadTemplates(dataDir string) ([]Template, error) {
 	entries, err := os.ReadDir(TemplatesDir(dataDir))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []Template{}, nil
-		}
+	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 
-	templates := make([]Template, 0, len(entries))
+	builtin := builtinTemplates()
+	templates := make([]Template, 0, len(entries)+len(builtin))
+	for _, template := range builtin {
+		templates = append(templates, template)
+	}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
@@ -339,7 +365,7 @@ func LoadTemplates(dataDir string) ([]Template, error) {
 		if err != nil {
 			continue
 		}
-		if parsed.Spec.Draft {
+		if _, shadowed := builtin[parsed.Name]; shadowed || parsed.Spec.Draft {
 			continue
 		}
 		templates = append(templates, parsed)
@@ -353,6 +379,9 @@ func LoadTemplates(dataDir string) ([]Template, error) {
 func LoadTemplate(dataDir, name string) (Template, error) {
 	if name == "" || strings.ContainsAny(name, `/\`) {
 		return Template{}, fmt.Errorf("invalid template name %q", name)
+	}
+	if template, ok := builtinTemplates()[name]; ok {
+		return template, nil
 	}
 	return loadTemplateFile(filepath.Join(TemplatesDir(dataDir), name+".yaml"), name)
 }

@@ -702,6 +702,24 @@
     "subject placeholder": "e.g. alice or role:admin",
     "user placeholder": "e.g. alice"
   },
+  "privateAi": {
+    "CPU only — slower": "CPU only — slower",
+    "Downloading the app — a few GB, only the first time": "Downloading the app — a few GB, only the first time",
+    "Downloading the model {{model}}": "Downloading the model {{model}}",
+    "Install Private AI": "Install Private AI",
+    "Manage": "Manage",
+    "Model": "Model",
+    "More options": "More options",
+    "Preparing": "Preparing",
+    "Preparing the model": "Preparing the model",
+    "Private AI": "Private AI",
+    "Ready": "Ready",
+    "Something went wrong: {{reason}}": "Something went wrong: {{reason}}",
+    "Start chatting": "Start chatting",
+    "Starting": "Starting",
+    "Your own ChatGPT on this machine in one click: Ollama and Open WebUI, set up and connected, on your GPU when you have one.": "Your own ChatGPT on this machine in one click: Ollama and Open WebUI, set up and connected, on your GPU when you have one.",
+    "Your own ChatGPT, running on this machine. Chats and files never leave it.": "Your own ChatGPT, running on this machine. Chats and files never leave it."
+  },
   "provider": {
     "Client ID": "Client ID",
     "Client ID - Tooltip": "The client ID issued by your OAuth provider when you registered this application",

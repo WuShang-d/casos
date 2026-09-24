@@ -33,13 +33,13 @@ type registryMirrorSelection struct {
 	ghcr      bool
 }
 
-func (d *NodeDeployer) installNodeBinaries(ctx context.Context, runner NodeDeployRunner, arch, k8sVersion string) error {
+func (d *NodeDeployer) installNodeBinaries(ctx context.Context, runner NodeDeployRunner, arch, k8sVersion string) (*nodeGPU, error) {
 	version := k8sVersion
 	cniVersion := defaultNodeDeployCNIVersion
 
 	d.logStep(nodeDeployPhaseInstalling, "Installing node dependencies and containerd")
 	if _, err := runner.RunRootContext(ctx, "dpkg -s ca-certificates curl iptables socat conntrack ebtables ethtool kmod containerd open-iscsi nfs-common >/dev/null 2>&1 || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl iptables socat conntrack ebtables ethtool kmod containerd open-iscsi nfs-common)"); err != nil {
-		return fmt.Errorf("install packages: %w", err)
+		return nil, fmt.Errorf("install packages: %w", err)
 	}
 	// CSI drivers reach volumes through the node's own iSCSI and NFS clients:
 	// Longhorn's manager exits at startup with "please make sure you have
@@ -62,7 +62,7 @@ net.ipv4.ip_forward = 1
 EOF
 sysctl --system >/dev/null
 test -e /proc/sys/net/bridge/bridge-nf-call-iptables`); err != nil {
-		return fmt.Errorf("configure Kubernetes kernel networking: %w", err)
+		return nil, fmt.Errorf("configure Kubernetes kernel networking: %w", err)
 	}
 	if _, err := runner.RunRootContext(ctx, fmt.Sprintf(`set -e
 if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
@@ -77,22 +77,28 @@ else
 fi
 ln -sfn "$resolver" %[1]s
 test -f %[1]s`, nodeDeployResolverPath)); err != nil {
-		return fmt.Errorf("configure node resolver: %w", err)
+		return nil, fmt.Errorf("configure node resolver: %w", err)
 	}
+
+	gpu := d.prepareNodeGPU(ctx, runner)
 
 	d.logStep(nodeDeployPhaseConfiguring, "Configuring containerd")
 	mirrors, err := d.resolveRegistryMirrors(ctx, runner)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := runner.WriteFileContext(ctx, "/etc/containerd/config.toml", GenerateContainerdConfig(d.config.SandboxImage), "0644"); err != nil {
-		return fmt.Errorf("write /etc/containerd/config.toml: %w", err)
+	containerdConfig := GenerateContainerdConfig(d.config.SandboxImage)
+	if gpu != nil {
+		containerdConfig += nvidiaContainerdRuntime
+	}
+	if err := runner.WriteFileContext(ctx, "/etc/containerd/config.toml", containerdConfig, "0644"); err != nil {
+		return nil, fmt.Errorf("write /etc/containerd/config.toml: %w", err)
 	}
 	if err := d.reconcileRegistryMirrorFiles(ctx, runner, mirrors); err != nil {
-		return err
+		return nil, err
 	}
 	if _, err := runner.RunRootContext(ctx, "systemctl enable --now containerd && systemctl restart containerd"); err != nil {
-		return fmt.Errorf("start containerd: %w", err)
+		return nil, fmt.Errorf("start containerd: %w", err)
 	}
 
 	d.logStep(nodeDeployPhaseInstalling, "Ensuring upstream kubelet, kube-proxy, and CNI plugins")
@@ -123,9 +129,9 @@ if [ ! -x /opt/cni/bin/bridge ] || [ ! -x /opt/cni/bin/loopback ] || [ ! -x /opt
   tar -xzf /tmp/cni-plugins.tgz -C /opt/cni/bin
 fi`, version, version, arch, version, arch, cniVersion, arch, cniVersion)
 	if _, err := runner.RunRootContext(ctx, installCmd); err != nil {
-		return fmt.Errorf("install node binaries: %w", err)
+		return nil, fmt.Errorf("install node binaries: %w", err)
 	}
-	return nil
+	return gpu, nil
 }
 
 func (d *NodeDeployer) resolveRegistryMirrors(ctx context.Context, runner registryMirrorFileRunner) (registryMirrorSelection, error) {

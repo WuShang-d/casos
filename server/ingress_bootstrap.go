@@ -25,6 +25,11 @@ const (
 	defaultIngressControllerImage = "docker.io/library/traefik:v3.3.4"
 )
 
+// IngressControllerService names the Service the ingress controller answers on.
+func IngressControllerService() (namespace, name string) {
+	return ingressControllerNamespace, ingressControllerName
+}
+
 func ingressControllerLabels() map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":       ingressControllerName,

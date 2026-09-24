@@ -59,3 +59,10 @@ export function getTemplateInstance(namespace, name) {
 export function deleteTemplateInstance(payload) {
   return post("/api/delete-template-instance", payload);
 }
+
+export function getTemplateInstanceStatus(namespace, name) {
+  const params = new URLSearchParams({namespace, name});
+  return fetch(`${Setting.ServerUrl}/api/get-template-instance-status?${params}`, {
+    credentials: "include", headers: lang(),
+  }).then(r => r.json());
+}

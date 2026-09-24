@@ -21,6 +21,7 @@ import {HelmInstallDialog} from "@/components/shared/helm-install-dialog";
 import {ImageInstallDialog} from "@/components/shared/image-install-dialog";
 import {APP_CATALOG, APP_CATEGORIES} from "@/lib/appCatalog";
 import {cn} from "@/lib/utils";
+import {PrivateAiCard} from "@/components/shared/private-ai-card";
 
 const RECOMMENDED = "recommended";
 
@@ -272,6 +273,8 @@ function SimpleAppStore() {
           ))}
         </TabsList>
       </Tabs>
+
+      {catalogTab ? null : <PrivateAiCard />}
 
       <div className="relative max-w-sm">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />

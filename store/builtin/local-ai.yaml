@@ -1,0 +1,294 @@
+apiVersion: app.sealos.io/v1
+kind: Template
+metadata:
+  name: local-ai
+spec:
+  title: 'Private AI'
+  url: 'https://openwebui.com'
+  gitRepo: 'https://github.com/casosorg/casos'
+  author: 'CasOS'
+  description: 'Your own ChatGPT on your own machine: Ollama and Open WebUI, wired together, running on your NVIDIA GPU when you have one. Nothing leaves the computer.'
+  readme: 'https://raw.githubusercontent.com/labring-actions/templates/kb-0.9/template/open-webui/README.md'
+  icon: 'https://raw.githubusercontent.com/labring-actions/templates/kb-0.9/template/open-webui/logo.png'
+  templateType: inline
+  locale: en
+  categories:
+    - ai
+  defaults:
+    app_name:
+      type: string
+      value: ai-${{ random(6) }}
+    host:
+      type: string
+      value: ${{ defaults.app_name }}
+    webui_secret_key:
+      type: string
+      value: ${{ random(48) }}
+  inputs:
+    model:
+      description: 'The model to download first. The default is the largest one that fits your GPU memory; more can be added from Open WebUI later.'
+      type: choice
+      default: "${{ CASOS_GPU_MEMORY_MIB >= 12000 && 'qwen3:14b' || CASOS_GPU_MEMORY_MIB >= 6000 && 'qwen3:8b' || 'qwen3:4b' }}"
+      options:
+        - 'qwen3:1.7b'
+        - 'qwen3:4b'
+        - 'qwen3:8b'
+        - 'qwen3:14b'
+        - 'deepseek-r1:7b'
+        - 'deepseek-r1:14b'
+        - 'gemma3:4b'
+        - 'gemma3:12b'
+        - 'llama3.2:3b'
+        - 'gpt-oss:20b'
+      required: true
+    enable_login:
+      description: 'Ask for an account. The first account created becomes the administrator; turn this off only when nobody else can reach this machine.'
+      type: boolean
+      default: 'true'
+      required: false
+  i18n:
+    zh:
+      title: '私有 AI'
+      description: '在你自己的电脑上拥有一个 ChatGPT：Ollama 和 Open WebUI 一键装好、自动连通，有 NVIDIA 显卡时自动用显卡加速。数据不出本机。'
+      readme: 'https://raw.githubusercontent.com/labring-actions/templates/kb-0.9/template/open-webui/README_zh.md'
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${{ defaults.app_name }}-ollama
+  labels:
+    app: ${{ defaults.app_name }}-ollama
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  serviceName: ${{ defaults.app_name }}-ollama
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-ollama
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-ollama
+    spec:
+      automountServiceAccountToken: false
+      ${{ if(CASOS_GPU === 'nvidia') }}
+      runtimeClassName: nvidia
+      ${{ endif() }}
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.32.5
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OLLAMA_KEEP_ALIVE
+              value: '30m'
+            ${{ if(CASOS_GPU === 'nvidia') }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: compute,utility
+            ${{ endif() }}
+          ports:
+            - name: http
+              containerPort: 11434
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+  volumeClaimTemplates:
+    - metadata:
+        name: models
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-ollama
+  labels:
+    app: ${{ defaults.app_name }}-ollama
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${{ defaults.app_name }}-pull-model
+  labels:
+    app: ${{ defaults.app_name }}-pull-model
+spec:
+  backoffLimit: 20
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-pull-model
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      containers:
+        - name: pull
+          image: ollama/ollama:0.32.5
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OLLAMA_HOST
+              value: http://${{ defaults.app_name }}-ollama:11434
+            - name: MODEL
+              value: '${{ inputs.model }}'
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until ollama list >/dev/null 2>&1; do sleep 3; done
+              ollama pull nomic-embed-text
+              ollama pull "$MODEL"
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    app: ${{ defaults.app_name }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  serviceName: ${{ defaults.app_name }}
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: open-webui
+          image: openwebui/open-webui:0.10.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OLLAMA_BASE_URL
+              value: http://${{ defaults.app_name }}-ollama:11434
+            - name: ENABLE_OPENAI_API
+              value: 'False'
+            - name: DEFAULT_MODELS
+              value: '${{ inputs.model }}'
+            - name: RAG_EMBEDDING_ENGINE
+              value: ollama
+            - name: RAG_EMBEDDING_MODEL
+              value: nomic-embed-text
+            - name: WEBUI_AUTH
+              value: "${{ inputs.enable_login === 'false' && 'False' || 'True' }}"
+            - name: WEBUI_SECRET_KEY
+              value: ${{ defaults.webui_secret_key }}
+            - name: WEBUI_URL
+              value: http://${{ defaults.host }}.${{ SEALOS_CLOUD_DOMAIN }}${{ CASOS_APP_PORT_SUFFIX }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 120
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - name: data
+              mountPath: /app/backend/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    app: ${{ defaults.app_name }}
+spec:
+  selector:
+    app: ${{ defaults.app_name }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    app: ${{ defaults.app_name }}
+spec:
+  rules:
+    - host: ${{ defaults.host }}.${{ SEALOS_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8080
+---
+apiVersion: app.sealos.io/v1
+kind: App
+metadata:
+  name: ${{ defaults.app_name }}
+spec:
+  data:
+    url: http://${{ defaults.host }}.${{ SEALOS_CLOUD_DOMAIN }}${{ CASOS_APP_PORT_SUFFIX }}
+  displayType: normal
+  icon: 'https://raw.githubusercontent.com/labring-actions/templates/kb-0.9/template/open-webui/logo.png'
+  name: 'Private AI'
+  type: link

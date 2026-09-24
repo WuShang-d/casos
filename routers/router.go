@@ -79,6 +79,7 @@ func InitAPI() {
 	beego.Router("/api/deploy-template", &controllers.ApiController{}, "POST:DeployTemplate")
 	beego.Router("/api/get-template-instances", &controllers.ApiController{}, "GET:GetTemplateInstances")
 	beego.Router("/api/get-template-instance", &controllers.ApiController{}, "GET:GetTemplateInstance")
+	beego.Router("/api/get-template-instance-status", &controllers.ApiController{}, "GET:GetTemplateInstanceStatus")
 	beego.Router("/api/delete-template-instance", &controllers.ApiController{}, "POST:DeleteTemplateInstance")
 	beego.Router("/api/get-database-params", &controllers.ApiController{}, "GET:GetDatabaseParams")
 	beego.Router("/api/configure-database", &controllers.ApiController{}, "POST:ConfigureDatabase")

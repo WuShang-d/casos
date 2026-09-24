@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import {Progress} from "@/components/ui/progress";
 import {PageContainer} from "@/components/shared/page-header";
+import {PrivateAiCard} from "@/components/shared/private-ai-card";
 import {getDashboardHealthState} from "@/lib/dashboardHealth";
 import {useUiMode} from "@/hooks/use-ui-mode";
 import {cn} from "@/lib/utils";
@@ -170,6 +171,8 @@ function SimpleHome({stats, releases, machines, checklist}) {
           </CardFooter>
         ) : null}
       </Card>
+
+      {needsNodes ? null : <PrivateAiCard />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <CountCard

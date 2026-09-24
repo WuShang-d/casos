@@ -90,7 +90,8 @@ func (d *NodeDeployer) Deploy(ctx context.Context, opts NodeDeployOptions) (*Nod
 		return nil, fmt.Errorf("query apiserver version: %w", err)
 	}
 
-	if err = d.installNodeBinaries(ctx, runner, preflightResult.Arch, k8sVersion); err != nil {
+	gpu, err := d.installNodeBinaries(ctx, runner, preflightResult.Arch, k8sVersion)
+	if err != nil {
 		return nil, err
 	}
 	if err = d.writeNodeFiles(ctx, runner, opts.NodeName, wk.Kubeconfig); err != nil {
@@ -123,6 +124,11 @@ func (d *NodeDeployer) Deploy(ctx context.Context, opts NodeDeployOptions) (*Nod
 		}
 	} else {
 		d.logStep(nodeDeployPhaseWaiting, "Node is already Ready")
+	}
+	if err = d.reconcileNodeGPU(ctx, opts.NodeName, gpu); err != nil {
+		d.logStep(nodeDeployPhaseConfiguring, fmt.Sprintf("Could not publish the node's GPU: %v", err))
+	} else if gpu != nil {
+		d.logStep(nodeDeployPhaseConfiguring, fmt.Sprintf("GPU %s is available to Pods with runtimeClassName: %s", gpu.product, NvidiaRuntimeClass))
 	}
 	// The CasOS host is deployed through a local shell rather than a login, so
 	// there is no session to keep working and no key to leave behind.

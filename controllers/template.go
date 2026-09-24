@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +64,9 @@ type templateDetail struct {
 	// Defaults are shown so a reader can see the names the template will use
 	// before deploying it.
 	Defaults map[string]string `json:"defaults"`
+	// Gpu names the GPU the app would get, empty when the cluster has none.
+	Gpu          string `json:"gpu"`
+	GpuMemoryMiB int    `json:"gpuMemoryMiB"`
 }
 
 type templateInstanceSummary struct {
@@ -143,7 +148,7 @@ func (c *ApiController) GetTemplates() {
 		return
 	}
 	status := store.ReadTemplateRepoStatus(dataDir)
-	if len(templates) == 0 {
+	if status.Count == 0 {
 		ctx, cancel := context.WithTimeout(c.Ctx.Request.Context(), templateSyncTimeout)
 		defer cancel()
 		if synced, syncErr := store.SyncTemplates(ctx, proxy.GetHttpClient(""), dataDir, status.Repo, status.Branch); syncErr == nil {
@@ -259,10 +264,18 @@ func templateInputFields(template store.Template, data templateData, language st
 	return fields
 }
 
+// platformEnv carries, besides the sealos names, what casos adds for its own
+// templates: the GPU the cluster has, and the port suffix an app address needs
+// when the app gateway on the casos port is what serves it.
 func (c *ApiController) platformEnv(namespace string) map[string]string {
 	domain := strings.TrimSpace(c.GetString("domain"))
 	if domain == "" {
 		domain = defaultCloudDomain(c.Ctx.Request.Host)
+	}
+	gpu := clusterGPU(getAdminRestConfig())
+	gpuKind := ""
+	if gpu.Name != "" {
+		gpuKind = "nvidia"
 	}
 	return map[string]string{
 		"SEALOS_NAMESPACE":        namespace,
@@ -270,7 +283,22 @@ func (c *ApiController) platformEnv(namespace string) map[string]string {
 		"SEALOS_CERT_SECRET_NAME": defaultCertSecretName,
 		"SEALOS_SERVICE_ACCOUNT":  "default",
 		"DESKTOP_DOMAIN":          domain,
+		"CASOS_GPU":               gpuKind,
+		"CASOS_GPU_NAME":          gpu.Name,
+		"CASOS_GPU_MEMORY_MIB":    strconv.Itoa(gpu.MemoryMiB),
+		"CASOS_APP_PORT_SUFFIX":   appGatewayPortSuffix(domain, c.Ctx.Request.Host),
 	}
+}
+
+func appGatewayPortSuffix(domain, requestHost string) string {
+	if !isAppGatewayDomain(domain) {
+		return ""
+	}
+	_, port, err := net.SplitHostPort(requestHost)
+	if err != nil || port == "" || port == "80" {
+		return ""
+	}
+	return ":" + port
 }
 
 // defaultCloudDomain is the address templates build their hostnames from. The
@@ -318,7 +346,9 @@ func (c *ApiController) GetTemplate() {
 		Screenshots:     template.Spec.Screenshots,
 		Inputs:          templateInputFields(template, data, language),
 		Defaults:        defaults,
+		Gpu:             env["CASOS_GPU_NAME"],
 	}
+	detail.GpuMemoryMiB, _ = strconv.Atoi(env["CASOS_GPU_MEMORY_MIB"])
 	if translated, ok := template.Spec.I18n[language]; ok && translated.Readme != "" {
 		detail.Readme = translated.Readme
 	}
