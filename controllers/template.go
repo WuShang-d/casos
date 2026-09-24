@@ -267,8 +267,8 @@ func templateInputFields(template store.Template, data templateData, language st
 // platformEnv carries, besides the sealos names, what casos adds for its own
 // templates: the GPU the cluster has, and the port suffix an app address needs
 // when the app gateway on the casos port is what serves it.
-func (c *ApiController) platformEnv(namespace string) map[string]string {
-	domain := strings.TrimSpace(c.GetString("domain"))
+func (c *ApiController) platformEnv(namespace, domain string) map[string]string {
+	domain = strings.TrimSpace(domain)
 	if domain == "" {
 		domain = defaultCloudDomain(c.Ctx.Request.Host)
 	}
@@ -302,13 +302,25 @@ func appGatewayPortSuffix(domain, requestHost string) string {
 }
 
 // defaultCloudDomain is the address templates build their hostnames from. The
-// host the reader is already on is the best guess available without asking.
+// host the reader is already on is the best guess available without asking,
+// except that an address cannot have subdomains: a loopback address stands in
+// for localhost, and any other IPv4 address for its name under sslip.io, which
+// resolves every subdomain back to that address.
 func defaultCloudDomain(host string) string {
-	if index := strings.LastIndex(host, ":"); index > 0 {
-		host = host[:index]
+	if name, _, err := net.SplitHostPort(host); err == nil {
+		host = name
 	}
+	host = strings.Trim(host, "[]")
 	if host == "" {
 		return "cluster.local"
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() {
+			return "localhost"
+		}
+		if ip.To4() != nil {
+			return strings.ReplaceAll(ip.String(), ".", "-") + ".sslip.io"
+		}
 	}
 	return host
 }
@@ -335,7 +347,7 @@ func (c *ApiController) GetTemplate() {
 		namespace = "default"
 	}
 	language := templateLanguage(c.GetString("language"))
-	env := c.platformEnv(namespace)
+	env := c.platformEnv(namespace, c.GetString("domain"))
 	defaults := renderedDefaults(template, env)
 	data := templateData{Defaults: defaults, Env: env}
 
@@ -398,6 +410,9 @@ func renderTemplate(template store.Template, req templateDeployRequest, env map[
 	}
 
 	rendered := renderTemplateText(template.Manifests, data)
+	if isAppGatewayDomain(env["SEALOS_CLOUD_DOMAIN"]) {
+		rendered = appGatewayAddresses(rendered, env["SEALOS_CLOUD_DOMAIN"], env["CASOS_APP_PORT_SUFFIX"])
+	}
 	return instance, data, store.SplitYamlDocuments(rendered), missing
 }
 
@@ -435,11 +450,7 @@ func (c *ApiController) PreviewTemplate() {
 		return
 	}
 
-	env := c.platformEnv(req.Namespace)
-	if req.Domain != "" {
-		env["SEALOS_CLOUD_DOMAIN"] = req.Domain
-		env["DESKTOP_DOMAIN"] = req.Domain
-	}
+	env := c.platformEnv(req.Namespace, req.Domain)
 	instance, data, documents, _ := renderTemplate(template, req, env)
 
 	c.ResponseOk(map[string]any{
@@ -480,11 +491,7 @@ func (c *ApiController) DeployTemplate() {
 		return
 	}
 
-	env := c.platformEnv(req.Namespace)
-	if req.Domain != "" {
-		env["SEALOS_CLOUD_DOMAIN"] = req.Domain
-		env["DESKTOP_DOMAIN"] = req.Domain
-	}
+	env := c.platformEnv(req.Namespace, req.Domain)
 	instance, data, documents, missing := renderTemplate(template, req, env)
 	if len(missing) > 0 {
 		c.ResponseError("these fields are required: " + strings.Join(missing, ", "))
@@ -496,6 +503,7 @@ func (c *ApiController) DeployTemplate() {
 		c.ResponseError(err.Error())
 		return
 	}
+	applier.plainHTTP = isAppGatewayDomain(env["SEALOS_CLOUD_DOMAIN"])
 	report := applier.apply(c.Ctx.Request.Context(), documents)
 
 	language := templateLanguage(c.GetString("language"))

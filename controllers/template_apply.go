@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	sigsyaml "sigs.k8s.io/yaml"
@@ -36,9 +37,10 @@ import (
 // swallowed: an app that half-installed should say which piece is missing.
 
 const (
-	templateInstanceLabel = "casos.io/template-instance"
-	templateNameLabel     = "casos.io/template"
-	templateManagedBy     = "casos"
+	legacyIngressClassAnnotation = "kubernetes.io/ingress.class"
+	templateInstanceLabel        = "casos.io/template-instance"
+	templateNameLabel            = "casos.io/template"
+	templateManagedBy            = "casos"
 )
 
 type appliedObject struct {
@@ -77,6 +79,9 @@ type templateApplier struct {
 	namespace string
 	instance  string
 	template  string
+	// plainHTTP is set when the app gateway serves the instance's addresses.
+	plainHTTP      bool
+	ingressClasses map[string]bool
 }
 
 func newTemplateApplier(cfg *rest.Config, namespace, instance, template string) (*templateApplier, error) {
@@ -160,6 +165,9 @@ func (a *templateApplier) apply(ctx context.Context, documents []string) templat
 			}
 			report.Databases = append(report.Databases, name)
 		default:
+			if group == "networking.k8s.io" && item.GetKind() == "Ingress" {
+				a.adaptIngress(ctx, item)
+			}
 			applied, err := a.applyObject(ctx, item)
 			if err != nil {
 				report.Unsupported = append(report.Unsupported, unsupportedObject{
@@ -175,6 +183,44 @@ func (a *templateApplier) apply(ctx context.Context, documents []string) templat
 	}
 
 	return report
+}
+
+// adaptIngress fits a sealos Ingress to this cluster. sealos names its nginx
+// class in the legacy annotation, and an Ingress of a class nobody runs is
+// served by nobody, so the annotation goes and the default class takes it.
+// Behind the app gateway there is no TLS to terminate, and a TLS section would
+// keep the route off the plain HTTP entrypoint the gateway talks to.
+func (a *templateApplier) adaptIngress(ctx context.Context, item *unstructured.Unstructured) {
+	if class := item.GetAnnotations()[legacyIngressClassAnnotation]; class != "" && !a.hasIngressClass(ctx, class) {
+		annotations := item.GetAnnotations()
+		delete(annotations, legacyIngressClassAnnotation)
+		item.SetAnnotations(annotations)
+	}
+	if className, _, _ := unstructured.NestedString(item.Object, "spec", "ingressClassName"); className != "" && !a.hasIngressClass(ctx, className) {
+		unstructured.RemoveNestedField(item.Object, "spec", "ingressClassName")
+	}
+	if a.plainHTTP {
+		unstructured.RemoveNestedField(item.Object, "spec", "tls")
+	}
+}
+
+func (a *templateApplier) hasIngressClass(ctx context.Context, name string) bool {
+	if a.ingressClasses == nil {
+		client, err := kubernetes.NewForConfig(a.cfg)
+		if err != nil {
+			return true
+		}
+		classes, err := client.NetworkingV1().IngressClasses().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			// Unable to tell, so the template's choice stands.
+			return true
+		}
+		a.ingressClasses = map[string]bool{}
+		for _, class := range classes.Items {
+			a.ingressClasses[class.Name] = true
+		}
+	}
+	return a.ingressClasses[name]
 }
 
 func appEntryOf(item *unstructured.Unstructured) templateAppEntry {

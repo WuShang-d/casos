@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,7 +28,8 @@ import (
 // on Windows nothing on the machine answers port 80: the ingress controller
 // runs inside WSL, behind WSL's own address. So casos answers for *.localhost
 // on its own port and hands the request, Host header and all, to the ingress
-// controller.
+// controller. A machine reached by its LAN address gets the same through
+// sslip.io names, which resolve to the address they carry.
 
 const appGatewayTargetTTL = 15 * time.Second
 
@@ -37,17 +39,34 @@ var appGatewayTarget struct {
 	fetched time.Time
 }
 
+var (
+	sslipDomainPattern = regexp.MustCompile(`^(?:[a-z0-9-]+\.)*\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}\.sslip\.io$`)
+	sslipAppPattern    = regexp.MustCompile(`^(?:[a-z0-9-]+\.)+\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}\.sslip\.io$`)
+)
+
 func isAppGatewayDomain(domain string) bool {
-	return domain == "localhost" || strings.HasSuffix(domain, ".localhost")
+	domain = strings.ToLower(domain)
+	return domain == "localhost" || strings.HasSuffix(domain, ".localhost") || sslipDomainPattern.MatchString(domain)
 }
 
 // IsAppGatewayHost reports whether a request is for an app rather than for
-// casos itself: a name under localhost, not localhost.
+// casos itself: a name under localhost or under an sslip.io address, not the
+// name casos itself is reached by.
 func IsAppGatewayHost(host string) bool {
 	if name, _, err := net.SplitHostPort(host); err == nil {
 		host = name
 	}
-	return strings.HasSuffix(strings.ToLower(host), ".localhost")
+	host = strings.ToLower(host)
+	return strings.HasSuffix(host, ".localhost") || sslipAppPattern.MatchString(host)
+}
+
+// appGatewayAddresses rewrites what a sealos template assumes about its own
+// addresses (HTTPS on port 443 behind a wildcard certificate) into what the
+// app gateway serves: plain HTTP on the casos port.
+func appGatewayAddresses(text, domain, portSuffix string) string {
+	host := `((?:[A-Za-z0-9-]+\.)*` + regexp.QuoteMeta(domain) + `)(?::443)?([^A-Za-z0-9.:-]|$)`
+	text = regexp.MustCompile(`\bhttps://`+host).ReplaceAllString(text, "http://${1}"+portSuffix+"${2}")
+	return regexp.MustCompile(`\bwss://`+host).ReplaceAllString(text, "ws://${1}"+portSuffix+"${2}")
 }
 
 // AppGatewayTarget is where the ingress controller answers. Its load balancer

@@ -21,6 +21,9 @@ func AppGateway(next http.Handler) http.Handler {
 			request.SetXForwarded()
 			request.Out.Host = request.In.Host
 		},
+		// The ingress controller is on the cluster network next door, so a
+		// proxy the host is configured with must not be asked for it.
+		Transport: appGatewayTransport(),
 		// Chat replies stream token by token.
 		FlushInterval: -1,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
@@ -39,4 +42,10 @@ func AppGateway(next http.Handler) http.Handler {
 		}
 		proxy.ServeHTTP(w, r)
 	})
+}
+
+func appGatewayTransport() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	return transport
 }
