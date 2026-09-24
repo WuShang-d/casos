@@ -216,7 +216,7 @@ function AgentAccessPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title={i18next.t("agent:Create token")}
-        submitText={i18next.t("agent:Create")}
+        submitText={i18next.t("general:Create")}
         cancelText={i18next.t("general:Cancel")}
         submitting={submitting}
         onSubmit={handleCreate}
@@ -239,7 +239,7 @@ function AgentAccessPage() {
         title={i18next.t("agent:Token created")}
         size="lg"
         footer={
-          <Button type="button" onClick={() => setCreated(null)}>{i18next.t("agent:Done")}</Button>
+          <Button type="button" onClick={() => setCreated(null)}>{i18next.t("general:Done")}</Button>
         }
       >
         {created ? (

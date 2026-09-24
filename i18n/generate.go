@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/casosorg/casos/util"
 )
@@ -27,54 +28,59 @@ import (
 type I18nData map[string]map[string]string
 
 var (
-	reI18nFrontendCall      *regexp.Regexp
-	reI18nFrontendProperty  *regexp.Regexp
+	reI18nFrontendNamespace *regexp.Regexp
+	reI18nFrontendString    *regexp.Regexp
 	reI18nFrontendKey       *regexp.Regexp
 	reI18nBackendObject     *regexp.Regexp
 	reI18nBackendController *regexp.Regexp
 )
 
 func init() {
-	// A frontend key reaches i18next in one of two shapes, and both have to be
-	// matched here: a key the extractor misses is a key that never lands in the
-	// locale files, and i18next then falls back to rendering the key itself, so
-	// English looks correct and only the other language is visibly broken.
+	// A key the extractor misses never lands in the locale files, and i18next
+	// then renders the key itself, so English looks correct and only the other
+	// language is visibly broken. Keys reach i18next as translate call
+	// arguments, but also as object values translated later (nav.js,
+	// helmCompatibilityErrors.js) and as array elements (the example prompts in
+	// AgentAccessPage.jsx), so every string literal of the key shape counts.
+	// Nothing about "word:word" tells a key apart from a Tailwind class or a URL,
+	// so only the namespaces translate calls use are accepted, and parseAllWords
+	// applies that filter.
 	//
-	// The first shape is an argument to a translate call, written either as
-	// i18next.t(...) or as the t(...) that useTranslation returns. Capturing the
-	// whole argument list rather than just a leading string is what covers
-	// t("key", {count: n}) and t(cond ? "a" : "b"). Requiring a word boundary
-	// before the t keeps split(...) and its kin out.
-	//
-	// The second shape is a key held in an object and translated later, which is
-	// how nav.js carries the sidebar and breadcrumb labels and how
-	// helmCompatibilityErrors.js maps an error code to a message. Nothing about
-	// "word:word" tells a key apart from a Tailwind class or a URL, so those are
-	// kept honest by the namespace filter in parseAllWords rather than by the
-	// pattern.
-	reI18nFrontendCall, _ = regexp.Compile(`\bt\(((?:[^()"]|"[^"]*")*)\)`)
-	reI18nFrontendProperty, _ = regexp.Compile(`[A-Za-z_$][\w$]*:\s*("[A-Za-z][A-Za-z0-9]*:[^"\s][^"]*")`)
-	reI18nFrontendKey, _ = regexp.Compile(`"([A-Za-z][A-Za-z0-9]*:[^"\s][^"]*)"`)
+	// The namespace pattern reads the first string inside t(...), which covers
+	// t(cond ? "a:x" : "b:y"). Requiring a word boundary before the t keeps
+	// split(...) and its kin out.
+	reI18nFrontendNamespace = regexp.MustCompile(`\bt\([^()"]*"([A-Za-z][A-Za-z0-9]*):`)
+	reI18nFrontendString = regexp.MustCompile(`"((?:[^"\\\n]|\\.)*)"`)
+	reI18nFrontendKey = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*:\S`)
 	reI18nBackendObject, _ = regexp.Compile("i18n.Translate\\((.*?)\"\\)")
 	reI18nBackendController, _ = regexp.Compile("c.T\\((.*?)\"\\)")
 }
 
-func getAllI18nStringsFrontend(fileContent string) []string {
-	return matchI18nKeys(reI18nFrontendCall, fileContent)
-}
-
-func getAllI18nPropertyStringsFrontend(fileContent string) []string {
-	return matchI18nKeys(reI18nFrontendProperty, fileContent)
-}
-
-func matchI18nKeys(re *regexp.Regexp, fileContent string) []string {
+func getAllI18nNamespacesFrontend(fileContent string) []string {
 	res := []string{}
-	for _, match := range re.FindAllStringSubmatch(fileContent, -1) {
-		for _, key := range reI18nFrontendKey.FindAllStringSubmatch(match[1], -1) {
-			res = append(res, key[1])
+	for _, match := range reI18nFrontendNamespace.FindAllStringSubmatch(fileContent, -1) {
+		res = append(res, match[1])
+	}
+	return res
+}
+
+func getAllI18nStringsFrontend(fileContent string) []string {
+	res := []string{}
+	for _, match := range reI18nFrontendString.FindAllStringSubmatch(fileContent, -1) {
+		if isFrontendKey(match[1]) {
+			res = append(res, match[1])
 		}
 	}
 	return res
+}
+
+// An image reference such as "node:24" has the key shape and a real namespace;
+// a key is English text, so it has at least one letter after the colon.
+func isFrontendKey(s string) bool {
+	if !reI18nFrontendKey.MatchString(s) {
+		return false
+	}
+	return strings.ContainsFunc(strings.SplitN(s, ":", 2)[1], unicode.IsLetter)
 }
 
 func getNamespace(word string) string {
@@ -152,34 +158,33 @@ func parseAllWords(category string) *I18nData {
 	}
 
 	allWords := []string{}
-	propertyWords := []string{}
+	candidateWords := []string{}
+	namespaces := map[string]bool{}
 	for _, path := range paths {
 		fileContent := util.ReadStringFromPath(path)
 
-		var words []string
 		if category == "backend" {
 			if strings.HasSuffix(path, "deduplicate_test.go") {
 				continue
 			}
 
 			isControllerPackage := strings.Contains(path, "controller")
-			words = getAllI18nStringsBackend(fileContent, isControllerPackage)
+			allWords = append(allWords, getAllI18nStringsBackend(fileContent, isControllerPackage)...)
 		} else {
-			words = getAllI18nStringsFrontend(fileContent)
-			propertyWords = append(propertyWords, getAllI18nPropertyStringsFrontend(fileContent)...)
+			// Unit tests never render a key, and their node:test imports are in
+			// the node namespace.
+			if strings.Contains(filepath.Base(path), ".test.") {
+				continue
+			}
+
+			for _, namespace := range getAllI18nNamespacesFrontend(fileContent) {
+				namespaces[namespace] = true
+			}
+			candidateWords = append(candidateWords, getAllI18nStringsFrontend(fileContent)...)
 		}
-		allWords = append(allWords, words...)
 	}
 
-	// A translate call is unambiguous, so the namespaces it names are the whole
-	// set the frontend has. Object properties are not: "sm:max-w-lg" and
-	// "https://charts.rancher.io" have the same shape as a key, and only the
-	// namespace tells them apart.
-	namespaces := map[string]bool{}
-	for _, word := range allWords {
-		namespaces[getNamespace(word)] = true
-	}
-	for _, word := range propertyWords {
+	for _, word := range candidateWords {
 		if namespaces[getNamespace(word)] {
 			allWords = append(allWords, word)
 		}

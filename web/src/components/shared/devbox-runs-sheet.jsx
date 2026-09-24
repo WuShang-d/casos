@@ -20,7 +20,7 @@ const POLL_INTERVAL = 5000;
 
 const RUN_STATUS = {
   queued: {variant: "warning", label: "devbox:Queued"},
-  running: {variant: "info", label: "devbox:Running"},
+  running: {variant: "info", label: "simple:Running"},
   succeeded: {variant: "success", label: "devbox:Succeeded"},
   failed: {variant: "danger", label: "devbox:Failed"},
 };
@@ -219,7 +219,7 @@ export function DevboxRunsSheet({devbox, open, onClose, onChanged}) {
           </label>
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={i18next.t("devbox:CPU limit")} htmlFor="devbox-run-cpu">
+          <Field label={i18next.t("launchpad:CPU limit")} htmlFor="devbox-run-cpu">
             <Input
               id="devbox-run-cpu"
               value={form.cpuLimit}
@@ -227,7 +227,7 @@ export function DevboxRunsSheet({devbox, open, onClose, onChanged}) {
               placeholder={i18next.t("devbox:Same as the DevBox")}
             />
           </Field>
-          <Field label={i18next.t("devbox:Memory limit")} htmlFor="devbox-run-memory">
+          <Field label={i18next.t("launchpad:Memory limit")} htmlFor="devbox-run-memory">
             <Input
               id="devbox-run-memory"
               value={form.memoryLimit}

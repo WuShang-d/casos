@@ -220,7 +220,7 @@ function DashboardPage({account, accountUpdatedAt, onOpenAccount}) {
           description={t("dashboard:alert no nodes description")}
           action={
             <Button size="sm" onClick={() => history.push("/machines")}>
-              {t("general:Add Machine")}
+              {t("machine:Add Machine")}
               <ArrowRight />
             </Button>
           }

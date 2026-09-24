@@ -32,7 +32,7 @@ function describeStatus(status, model, t) {
     return {stage: t("privateAi:Preparing"), percent: null};
   }
   if (status.ready) {
-    return {stage: t("privateAi:Ready"), percent: 100, ready: true};
+    return {stage: t("launchpad:Ready"), percent: 100, ready: true};
   }
   const services = status.pods.filter((pod) => !pod.job);
   const failing = services.find((pod) => FAILURE_REASONS.includes(pod.reason));
