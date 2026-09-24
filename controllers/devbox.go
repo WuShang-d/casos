@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,6 +46,11 @@ const (
 	// below also spell out /opt/casos-ssh and /home/coder literally.
 	devboxSshImage = "lscr.io/linuxserver/openssh-server:10.3_p1-r1-ls237"
 	devboxSshTools = "/opt/casos-ssh"
+
+	// A first pull of a CUDA or data-science image easily takes longer than
+	// the default ten minutes, which would mark a box that is still starting
+	// as failed.
+	devboxProgressDeadline = int32(60 * 60)
 )
 
 // sshd runs inside the workspace container, so a Remote-SSH session gets the
@@ -135,6 +141,10 @@ type deployDevboxRequest struct {
 	SshPublicKeys string  `json:"sshPublicKeys"`
 	CpuLimit      *string `json:"cpuLimit"`
 	MemoryLimit   *string `json:"memoryLimit"`
+
+	// Set only for a sandbox an AI agent asks for over MCP.
+	expiresAt time.Time
+	agent     string
 }
 
 type devboxSummary struct {
@@ -162,6 +172,9 @@ type devboxSummary struct {
 	PrepareStep   string   `json:"prepareStep"`
 	PodName       string   `json:"podName"`
 	LogContainers []string `json:"logContainers"`
+	// The access token of the agent that created the box, and when it is reclaimed.
+	Agent     string `json:"agent"`
+	ExpiresAt string `json:"expiresAt"`
 }
 
 type deployDevboxResult struct {
@@ -195,9 +208,17 @@ func (c *ApiController) DeployDevbox() {
 		c.ResponseError("invalid request body: " + err.Error())
 		return
 	}
-	if strings.TrimSpace(req.Name) == "" {
-		c.ResponseError("a name is required")
+	result, err := deployDevbox(cfg, req)
+	if err != nil {
+		c.ResponseError(err.Error())
 		return
+	}
+	c.ResponseOk(result)
+}
+
+func deployDevbox(cfg *rest.Config, req deployDevboxRequest) (*deployDevboxResult, error) {
+	if strings.TrimSpace(req.Name) == "" {
+		return nil, fmt.Errorf("a name is required")
 	}
 	if req.Namespace == "" {
 		req.Namespace = "default"
@@ -222,8 +243,7 @@ func (c *ApiController) DeployDevbox() {
 
 	sshKeys, err := normalizeSshPublicKeys(req.SshPublicKeys)
 	if err != nil {
-		c.ResponseError(err.Error())
-		return
+		return nil, err
 	}
 
 	env := devboxEnvironment{
@@ -236,8 +256,7 @@ func (c *ApiController) DeployDevbox() {
 	if env.repo != "" {
 		name, err := devboxRepoFolder(env.repo)
 		if err != nil {
-			c.ResponseError(err.Error())
-			return
+			return nil, err
 		}
 		env.folder = devboxHomeMount + "/" + name
 	}
@@ -261,22 +280,29 @@ func (c *ApiController) DeployDevbox() {
 		},
 		Command: []string{"/bin/sh", "-c", devboxEditorScript},
 	}
+	setUp := applyDevboxEnvironment(env, sshKeys != "")
 	opts := workloadOptions{
 		labels: map[string]string{devboxLabel: "true"},
-		mutate: applyDevboxEnvironment(env, sshKeys != ""),
+		mutate: func(depl *appsv1.Deployment) error {
+			if err := setUp(depl); err != nil {
+				return err
+			}
+			deadline := devboxProgressDeadline
+			depl.Spec.ProgressDeadlineSeconds = &deadline
+			applyDevboxLease(&depl.ObjectMeta, req.expiresAt, req.agent)
+			return nil
+		},
 	}
 
 	if _, err := deployAppWorkload(cfg, appReq, opts); err != nil {
-		c.ResponseError(err.Error())
-		return
+		return nil, err
 	}
 
 	summary := devboxSummary{Name: req.Name, Namespace: req.Namespace, Image: image, Status: "pending", Folder: env.folder, Repo: env.repo}
 	if depl, err := object.GetDeployment(cfg, req.Namespace, req.Name); err == nil {
 		summary = devboxSummaryOf(cfg, *depl, clusterNodeIP(cfg), nil)
 	}
-
-	c.ResponseOk(deployDevboxResult{devboxSummary: summary, Password: password})
+	return &deployDevboxResult{devboxSummary: summary, Password: password}, nil
 }
 
 // GetDevboxes lists the code-server workspaces, newest-looking first, with the
@@ -291,12 +317,18 @@ func (c *ApiController) GetDevboxes() {
 		c.ResponseError("apiserver not ready")
 		return
 	}
-	namespace := c.GetString("namespace")
-
-	deployments, err := object.GetDeployments(cfg, namespace)
+	result, err := listDevboxes(cfg, c.GetString("namespace"))
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
+	}
+	c.ResponseOk(result)
+}
+
+func listDevboxes(cfg *rest.Config, namespace string) ([]devboxSummary, error) {
+	deployments, err := object.GetDeployments(cfg, namespace)
+	if err != nil {
+		return nil, err
 	}
 
 	nodeIP := clusterNodeIP(cfg)
@@ -312,7 +344,7 @@ func (c *ApiController) GetDevboxes() {
 		result = append(result, summary)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt > result[j].CreatedAt })
-	c.ResponseOk(result)
+	return result, nil
 }
 
 func devboxSummaryOf(cfg *rest.Config, d appsv1.Deployment, nodeIP string, pods []corev1.Pod) devboxSummary {
@@ -331,6 +363,10 @@ func devboxSummaryOf(cfg *rest.Config, d appsv1.Deployment, nodeIP string, pods 
 		CreatedAt: d.CreationTimestamp.UTC().Format("2006-01-02 15:04:05"),
 		Folder:    devboxFolder(d),
 		Repo:      d.Annotations[devboxRepoAnnotation],
+		Agent:     d.Annotations[devboxAgentAnnotation],
+	}
+	if expiresAt, ok := devboxExpiry(d.ObjectMeta); ok {
+		summary.ExpiresAt = expiresAt.Format(time.RFC3339)
 	}
 	if status != "stopped" {
 		state := devboxPodStateOf(d, pods)

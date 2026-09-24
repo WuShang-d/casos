@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import i18next from "i18next";
 import {useTranslation} from "react-i18next";
-import {ChevronRight, Code2, ExternalLink, GitBranch, Laptop, Play, Plus, Rocket, ScrollText, Square, Trash2} from "lucide-react";
+import {Bot, ChevronRight, Code2, ExternalLink, GitBranch, Laptop, Pin, Play, Plus, Rocket, ScrollText, Square, Timer, Trash2} from "lucide-react";
 import * as DevboxBackend from "@/backend/DevboxBackend";
 import * as ImageBackend from "@/backend/ImageBackend";
 import * as NamespaceBackend from "@/backend/NamespaceBackend";
@@ -55,6 +55,18 @@ const PREPARE_STEPS = {
   "clone": () => i18next.t("devbox:Cloning the repository"),
   "setup": () => i18next.t("devbox:Running the setup script"),
 };
+
+function expiresIn(expiresAt) {
+  const minutes = Math.round((new Date(expiresAt).getTime() - Date.now()) / 60000);
+  if (minutes <= 0) {
+    return i18next.t("devbox:Expiring now");
+  }
+  const format = new Intl.RelativeTimeFormat(i18next.language, {numeric: "auto"});
+  const text = minutes < 60 ? format.format(minutes, "minute")
+    : minutes < 48 * 60 ? format.format(Math.round(minutes / 60), "hour")
+      : format.format(Math.round(minutes / 1440), "day");
+  return i18next.t("devbox:Expires {{when}}", {when: text});
+}
 
 function repoPath(repo) {
   try {
@@ -170,6 +182,13 @@ function DevboxPage() {
     });
   }
 
+  function keep(box) {
+    runAction(DevboxBackend.keepDevbox({namespace: box.namespace, name: box.name}), {
+      successMessage: i18next.t("devbox:Kept: it will no longer be deleted automatically"),
+      onSuccess: () => refresh({silent: true}),
+    });
+  }
+
   function remove() {
     if (!deleteTarget) {
       return;
@@ -200,6 +219,15 @@ function DevboxPage() {
           <div className="min-w-0">
             <div className="truncate font-medium">{value}</div>
             <div className="text-muted-foreground truncate text-xs">{record.namespace}</div>
+            {record.agent ? (
+              <div
+                className="text-muted-foreground flex items-center gap-1 truncate text-xs"
+                title={i18next.t("devbox:Created by an AI agent with the access token {{token}}", {token: record.agent})}
+              >
+                <Bot className="size-3 shrink-0" />
+                {record.agent}
+              </div>
+            ) : null}
           </div>
         </div>
       ),
@@ -222,6 +250,12 @@ function DevboxPage() {
           {record.setupFailed ? <Badge variant="danger">{i18next.t("devbox:Setup failed")}</Badge> : null}
           {record.activeRuns > 0 ? (
             <Badge variant="info">{i18next.t("devbox:{{count}} active", {count: record.activeRuns})}</Badge>
+          ) : null}
+          {record.expiresAt ? (
+            <Badge variant="warning" title={new Date(record.expiresAt).toLocaleString()} data-testid="devbox-expiry">
+              <Timer />
+              {expiresIn(record.expiresAt)}
+            </Badge>
           ) : null}
         </div>
       ),
@@ -264,7 +298,7 @@ function DevboxPage() {
     {
       key: "actions",
       title: i18next.t("general:Action"),
-      width: 280,
+      width: 312,
       align: "right",
       render: (_value, record) => (
         <div className="flex items-center justify-end gap-0.5">
@@ -351,6 +385,21 @@ function DevboxPage() {
               <Square />
             </Button>
           )}
+          {record.expiresAt ? (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={i18next.t("devbox:Keep")}
+              title={i18next.t("devbox:Keep this sandbox, so it is not deleted when its time runs out")}
+              data-testid="devbox-keep"
+              onClick={(event) => {
+                event.stopPropagation();
+                keep(record);
+              }}
+            >
+              <Pin />
+            </Button>
+          ) : null}
           <Button
             size="icon-sm"
             variant="ghost"

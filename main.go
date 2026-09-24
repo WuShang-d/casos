@@ -136,6 +136,7 @@ func main() {
 				logs.Warning("start controller-manager: %v", err)
 			}
 			server.RegisterInstallImageVulnerabilityReporter()
+			go controllers.StartDevboxReaper(ctx)
 			// Runs even when autoEnrollLocalNode is off: a node deployed by an
 			// earlier run still needs its distro held open, or WSL stops both.
 			deploy.ResumeWSLKeepAlives(ctx)

@@ -26,7 +26,7 @@
 |---|---|
 | 🚀 **一个文件，一分钟** | Kubernetes API Server、Controller Manager 和 Scheduler 都内嵌在一个可执行文件里。运行它的机器会自动成为工作节点。在 Windows 上，节点运行在 WSL 里；没有 WSL 的话 CasOS 会自动安装。 |
 | 🧠 **用自己的显卡跑私有 AI** | 一键装好 Ollama 和 Open WebUI，并按显存自动挑选能装下的最大模型，比如 Qwen 3、DeepSeek R1、Gemma 3 或 gpt-oss。模型跑在你的 NVIDIA 显卡上，数据不出本机。 |
-| 🤖 **AI Agent 能直接操作的云** | 内置 MCP Server，Claude Code、Cursor、Codex 可以直接部署应用、查看日志、回滚版本。一切都跑在你自己的机器上。 |
+| 🤖 **AI Agent 能直接操作的云** | 内置 MCP Server，Claude Code、Cursor、Codex 可以直接部署应用、查看日志、回滚版本。Agent 还能开沙箱：克隆代码、执行命令、跑 GPU 任务。沙箱到期自动删除，你也可以随时用 VS Code 打开，旁观或接手。一切都跑在你自己的机器上。 |
 | 🛠️ **带 GPU 的开发环境** | DevBox 提供浏览器里的 VS Code，也支持桌面版 VS Code 通过 SSH 连接。可以从任意 Git 仓库、任意镜像启动，并在 GPU 上跑任务。 |
 | 📦 **开箱即满的应用商店** | 直接安装 sealos 模板市场和 Helm Chart 里的应用。托管数据库自带备份和控制台。 |
 

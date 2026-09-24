@@ -30,7 +30,9 @@ const mcpInstructions = `This server deploys and operates apps on a casos Kubern
 
 To deploy the user's project: build a container image, push it to a registry the cluster can pull from (Docker Hub, GHCR, a private registry), then call deploy_app with that image. deploy_app creates the app or updates it in place, waits for the rollout, and returns the URLs the app answers on.
 
-If a rollout fails, read get_app_logs (previous=true for a crash loop) and get_app to see why, then fix and redeploy, or call rollback_app to return to the last working revision.`
+If a rollout fails, read get_app_logs (previous=true for a crash loop) and get_app to see why, then fix and redeploy, or call rollback_app to return to the last working revision.
+
+To run code instead of deploying it, call create_sandbox for an isolated Linux workspace, optionally with a Git repository cloned and a setup script run. Work in it with exec_in_sandbox, read_sandbox_file and write_sandbox_file, and hand long or GPU work to start_sandbox_job. A sandbox is deleted when its lease runs out; call extend_sandbox to keep working, and delete_sandbox when done. Each sandbox is also a DevBox the user can open in VS Code, so give them its url and password when they want to follow along.`
 
 type mcpRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -61,6 +63,13 @@ const (
 type mcpCaller struct {
 	user  string
 	token string
+}
+
+type mcpCallerKey struct{}
+
+func mcpCallerOf(ctx context.Context) mcpCaller {
+	caller, _ := ctx.Value(mcpCallerKey{}).(mcpCaller)
+	return caller
 }
 
 // ServeMCP answers one MCP request authenticated by a casos access token.
@@ -244,6 +253,7 @@ func callMCPTool(ctx context.Context, caller mcpCaller, tool *mcpTool, arguments
 		return mcpText("the casos apiserver is not ready yet; try again in a moment", true)
 	}
 
+	ctx = context.WithValue(ctx, mcpCallerKey{}, caller)
 	result, err := tool.handler(ctx, cfg, arguments)
 	if err != nil {
 		return mcpText(err.Error(), true)

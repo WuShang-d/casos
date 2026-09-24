@@ -491,16 +491,22 @@ func (c *ApiController) UninstallImageApp() {
 		c.ResponseError("name is required")
 		return
 	}
-
-	deployments, err := object.GetDeployments(cfg, req.Namespace)
-	if err != nil {
+	if err := uninstallImageApp(cfg, req.Namespace, req.Name, req.DeleteData); err != nil {
 		c.ResponseError(err.Error())
 		return
+	}
+	c.ResponseOk()
+}
+
+func uninstallImageApp(cfg *rest.Config, namespace, name string, deleteData bool) error {
+	deployments, err := object.GetDeployments(cfg, namespace)
+	if err != nil {
+		return err
 	}
 	removed := 0
 	var failures []string
 	for _, d := range deployments {
-		if !ownedByApp(d.ObjectMeta, req.Name) {
+		if !ownedByApp(d.ObjectMeta, name) {
 			continue
 		}
 		if err := object.DeleteDeployment(cfg, d.Namespace, d.Name); err != nil && !errors.IsNotFound(err) {
@@ -510,17 +516,15 @@ func (c *ApiController) UninstallImageApp() {
 		removed++
 	}
 	if removed == 0 && len(failures) == 0 {
-		c.ResponseError(fmt.Sprintf("no app named %s is installed in %s", req.Name, req.Namespace))
-		return
+		return fmt.Errorf("no app named %s is installed in %s", name, namespace)
 	}
 
-	services, err := object.GetServices(cfg, req.Namespace)
+	services, err := object.GetServices(cfg, namespace)
 	if err != nil {
-		c.ResponseError(err.Error())
-		return
+		return err
 	}
 	for _, svc := range services {
-		if !ownedByApp(svc.ObjectMeta, req.Name) {
+		if !ownedByApp(svc.ObjectMeta, name) {
 			continue
 		}
 		if err := object.DeleteService(cfg, svc.Namespace, svc.Name); err != nil && !errors.IsNotFound(err) {
@@ -528,16 +532,15 @@ func (c *ApiController) UninstallImageApp() {
 		}
 	}
 
-	failures = append(failures, deleteAppExtras(cfg, req.Namespace, req.Name)...)
+	failures = append(failures, deleteAppExtras(cfg, namespace, name)...)
 
-	if req.DeleteData {
-		claims, err := object.GetPersistentVolumeClaims(cfg, req.Namespace)
+	if deleteData {
+		claims, err := object.GetPersistentVolumeClaims(cfg, namespace)
 		if err != nil {
-			c.ResponseError(err.Error())
-			return
+			return err
 		}
 		for _, claim := range claims {
-			if !ownedByApp(claim.ObjectMeta, req.Name) {
+			if !ownedByApp(claim.ObjectMeta, name) {
 				continue
 			}
 			if err := object.DeletePersistentVolumeClaim(cfg, claim.Namespace, claim.Name); err != nil && !errors.IsNotFound(err) {
@@ -549,10 +552,9 @@ func (c *ApiController) UninstallImageApp() {
 	if len(failures) > 0 {
 		// Reported as a partial success: the app itself is gone by now, and
 		// saying nothing would leave resources behind to break its next install.
-		c.ResponseError(fmt.Sprintf("the app was uninstalled but these could not be deleted: %s", strings.Join(failures, ", ")))
-		return
+		return fmt.Errorf("the app was uninstalled but these could not be deleted: %s", strings.Join(failures, ", "))
 	}
-	c.ResponseOk()
+	return nil
 }
 
 type scaleImageAppRequest struct {

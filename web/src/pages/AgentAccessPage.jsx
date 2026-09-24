@@ -165,7 +165,7 @@ function AgentAccessPage() {
     <PageContainer>
       <PageHeader
         title={i18next.t("agent:AI Agents")}
-        description={i18next.t("agent:Let Claude Code, Cursor, Codex and other MCP clients deploy to casos, read app logs and roll back.")}
+        description={i18next.t("agent:Let Claude Code, Cursor, Codex and other MCP clients deploy to casos, read app logs, roll back, and run code in sandboxes on your own machines.")}
       />
 
       <Card>

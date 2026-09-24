@@ -69,50 +69,53 @@ func (c *ApiController) RunDevbox() {
 		c.ResponseError("invalid request body: " + err.Error())
 		return
 	}
+	run, err := startDevboxRun(cfg, req)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	c.ResponseOk(run)
+}
+
+func startDevboxRun(cfg *rest.Config, req runDevboxRequest) (*devboxRun, error) {
 	if req.Namespace == "" {
 		req.Namespace = "default"
 	}
 	req.Command = strings.TrimSpace(req.Command)
 	if req.Command == "" {
-		c.ResponseError("a command is required")
-		return
+		return nil, fmt.Errorf("a command is required")
 	}
 
 	depl, err := object.GetDeployment(cfg, req.Namespace, req.Devbox)
 	if err != nil {
-		c.ResponseError(err.Error())
-		return
+		return nil, err
 	}
 	if depl.Labels[devboxLabel] != "true" {
-		c.ResponseError(fmt.Sprintf("%s is not a DevBox", req.Devbox))
-		return
+		return nil, fmt.Errorf("%s is not a DevBox", req.Devbox)
 	}
 
 	node := devboxNode(cfg, depl)
 	if req.Gpu {
 		if clusterGPU(cfg).Name == "" {
-			c.ResponseError("no ready node in this cluster has an NVIDIA GPU")
-			return
+			return nil, fmt.Errorf("no ready node in this cluster has an NVIDIA GPU")
 		}
 		if node != "" {
 			if n, err := object.GetNode(cfg, node); err == nil && n.Labels[deploy.NvidiaGPUPresentLabel] != "true" {
-				c.ResponseError(fmt.Sprintf("this DevBox's home disk is on node %s, which has no GPU", node))
-				return
+				return nil, fmt.Errorf("this DevBox's home disk is on node %s, which has no GPU", node)
 			}
 		}
 	}
 
 	job, err := buildDevboxRunJob(depl, req, node)
 	if err != nil {
-		c.ResponseError(err.Error())
-		return
+		return nil, err
 	}
 	created, err := object.AddJob(cfg, job)
 	if err != nil {
-		c.ResponseError(err.Error())
-		return
+		return nil, err
 	}
-	c.ResponseOk(devboxRunOf(*created, nil))
+	run := devboxRunOf(*created, nil)
+	return &run, nil
 }
 
 // GetDevboxRuns returns the runs newest first, and in data2 the GPU a new run could use.

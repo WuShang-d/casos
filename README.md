@@ -27,7 +27,7 @@ Windows too. You need no YAML and no existing cluster.
 |---|---|
 | 🚀 **One file, one minute** | The Kubernetes API server, controller manager and scheduler are embedded in a single binary. The machine you start it on becomes a worker node. On Windows that node runs in WSL, and CasOS installs WSL for you if it is missing. |
 | 🧠 **Private AI on your own GPU** | One click installs Ollama and Open WebUI and picks the largest model that fits your GPU memory, such as Qwen 3, DeepSeek R1, Gemma 3 or gpt-oss. It runs on your NVIDIA card, and nothing leaves the machine. |
-| 🤖 **A cloud your AI agents can drive** | The built-in MCP server lets Claude Code, Cursor and Codex deploy apps, read their logs and roll them back. Everything runs on your hardware. |
+| 🤖 **A cloud your AI agents can drive** | The built-in MCP server lets Claude Code, Cursor and Codex deploy apps, read their logs and roll them back. Agents can also open sandboxes to clone code, run commands and start GPU jobs. Each sandbox is deleted when its time runs out, and you can open it in VS Code to watch or take over. Everything runs on your hardware. |
 | 🛠️ **Dev environments with a GPU** | DevBoxes give you VS Code in the browser, or desktop VS Code over SSH. Start one from any Git repo in any image, and run jobs on the GPU. |
 | 📦 **An app store that's already full** | Install apps from the sealos template catalogue and Helm charts. Managed databases come with backups and a console. |
 

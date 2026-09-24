@@ -29,3 +29,9 @@ export function getDevboxRuns(namespace, devbox) {
     credentials: "include", headers: lang(),
   }).then(r => r.json());
 }
+
+export function keepDevbox(payload) {
+  return fetch(`${Setting.ServerUrl}/api/keep-devbox`, {
+    method: "POST", credentials: "include", headers: jsonHeaders(), body: JSON.stringify(payload),
+  }).then(r => r.json());
+}
