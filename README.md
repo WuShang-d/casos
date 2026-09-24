@@ -30,6 +30,7 @@ Windows too. You need no YAML and no existing cluster.
 | 🤖 **A cloud your AI agents can drive** | The built-in MCP server lets Claude Code, Cursor and Codex deploy apps, read their logs and roll them back. Agents can also open sandboxes to clone code, run commands and start GPU jobs. Each sandbox is deleted when its time runs out, and you can open it in VS Code to watch or take over. Everything runs on your hardware. |
 | 🛠️ **Dev environments with a GPU** | DevBoxes give you VS Code in the browser, or desktop VS Code over SSH. Start one from any Git repo in any image, and run jobs on the GPU. |
 | 📦 **An app store that's already full** | Install apps from the sealos template catalogue and Helm charts. Managed databases come with backups and a console. |
+| 🚢 **Deploy from Git** | Give it a public repository and casos builds it in the cluster, from its Dockerfile or, without one, as a Node.js, Python, Go or static project. It deploys the result with an address. There is no registry to set up, and a rebuild ships the latest commit. |
 
 **Connect your AI agent with one command:**
 

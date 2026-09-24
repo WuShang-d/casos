@@ -1,7 +1,7 @@
 import React, {useMemo, useState} from "react";
 import i18next from "i18next";
 import {useTranslation} from "react-i18next";
-import {Pencil, Play, Rocket, Square, Trash2} from "lucide-react";
+import {GitBranch, Hammer, Pencil, Play, Rocket, Square, Trash2} from "lucide-react";
 import * as ImageBackend from "@/backend/ImageBackend";
 import * as MetricsBackend from "@/backend/MetricsBackend";
 import * as NamespaceBackend from "@/backend/NamespaceBackend";
@@ -14,8 +14,11 @@ import {PageContainer, PageHeader} from "@/components/shared/page-header";
 import {SimpleSelect} from "@/components/shared/simple-select";
 import {StatusBadge} from "@/components/shared/status-badge";
 import {AppIcon} from "@/components/shared/app-icon";
+import {GitBuildsSheet} from "@/components/shared/git-builds-sheet";
+import {GitDeployDialog} from "@/components/shared/git-deploy-dialog";
 import {runAction, useResource} from "@/hooks/use-resource";
 import {useUiMode} from "@/hooks/use-ui-mode";
+import {repoPath} from "@/lib/git";
 
 const POLL_INTERVAL = 15000;
 
@@ -55,6 +58,8 @@ function LaunchpadPage(props) {
   const [namespace, setNamespace] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteData, setDeleteData] = useState(false);
+  const [gitDeployOpen, setGitDeployOpen] = useState(false);
+  const [buildsTarget, setBuildsTarget] = useState(null);
 
   const {data: namespaces} = useResource(() => NamespaceBackend.getNamespaces(), [], {initialData: [], toastOnError: false});
   const {data: apps, loading, refresh} = useResource(
@@ -125,6 +130,12 @@ function LaunchpadPage(props) {
           <div className="min-w-0">
             <div className="truncate font-medium">{value}</div>
             <div className="text-muted-foreground truncate text-xs">{record.namespace}</div>
+            {record.gitRepo ? (
+              <div className="text-muted-foreground truncate font-mono text-xs" title={record.gitRepo}>
+                <GitBranch className="mr-1 inline size-3 align-[-2px]" />
+                {repoPath(record.gitRepo)}{record.gitCommit ? ` @ ${record.gitCommit.slice(0, 7)}` : ""}
+              </div>
+            ) : null}
           </div>
         </div>
       ),
@@ -175,10 +186,25 @@ function LaunchpadPage(props) {
     {
       key: "actions",
       title: i18next.t("general:Action"),
-      width: 190,
+      width: 220,
       align: "right",
       render: (_value, record) => (
         <div className="flex items-center justify-end gap-0.5">
+          {record.gitRepo ? (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={i18next.t("launchpad:Builds")}
+              title={i18next.t("launchpad:Builds")}
+              data-testid="launchpad-builds"
+              onClick={(event) => {
+                event.stopPropagation();
+                setBuildsTarget(record);
+              }}
+            >
+              <Hammer />
+            </Button>
+          ) : null}
           <Button
             size="icon-sm"
             variant="ghost"
@@ -241,10 +267,16 @@ function LaunchpadPage(props) {
         title={i18next.t("launchpad:App Launchpad")}
         description={i18next.t("launchpad:Run a container image as an application — sized, reachable and kept up.")}
         actions={
-          <Button onClick={() => history.push(resolvePath("/launchpad/new"))} data-testid="launchpad-create">
-            <Rocket />
-            {i18next.t("launchpad:Deploy app")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setGitDeployOpen(true)} data-testid="launchpad-deploy-git">
+              <GitBranch />
+              {i18next.t("launchpad:Deploy from Git")}
+            </Button>
+            <Button onClick={() => history.push(resolvePath("/launchpad/new"))} data-testid="launchpad-create">
+              <Rocket />
+              {i18next.t("launchpad:Deploy app")}
+            </Button>
+          </div>
         }
       />
 
@@ -276,6 +308,21 @@ function LaunchpadPage(props) {
             </Button>
           </div>
         }
+      />
+
+      <GitDeployDialog
+        open={gitDeployOpen}
+        onOpenChange={setGitDeployOpen}
+        namespaces={namespaces}
+        defaultNamespace={namespace === "all" ? "default" : namespace}
+        onStarted={(app) => setBuildsTarget(app)}
+      />
+
+      <GitBuildsSheet
+        app={buildsTarget}
+        open={Boolean(buildsTarget)}
+        onClose={() => setBuildsTarget(null)}
+        onChanged={() => refresh({silent: true})}
       />
 
       <ConfirmDialog

@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/casosorg/casos/conf"
 	"github.com/casosorg/casos/deploy"
 	"github.com/casosorg/casos/object"
 	"github.com/casosorg/casos/server"
@@ -157,4 +158,8 @@ func nodeIsReady(node corev1.Node) bool {
 		}
 	}
 	return false
+}
+
+func appGatewayHTTPPort() int {
+	return conf.GetConfigIntDefault("httpport", 20080)
 }

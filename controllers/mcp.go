@@ -28,7 +28,9 @@ var mcpProtocolVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26", "20
 
 const mcpInstructions = `This server deploys and operates apps on a casos Kubernetes cluster.
 
-To deploy the user's project: build a container image, push it to a registry the cluster can pull from (Docker Hub, GHCR, a private registry), then call deploy_app with that image. deploy_app creates the app or updates it in place, waits for the rollout, and returns the URLs the app answers on.
+To deploy the user's project from a public Git repository, call deploy_git_repo: casos clones it, builds the image itself (from its Dockerfile, or for a Node.js, Python, Go or static site without one) and deploys it, so no registry is needed. Push your changes first, then call it again to redeploy.
+
+Otherwise build a container image, push it to a registry the cluster can pull from (Docker Hub, GHCR, a private registry), then call deploy_app with that image. deploy_app creates the app or updates it in place, waits for the rollout, and returns the URLs the app answers on.
 
 If a rollout fails, read get_app_logs (previous=true for a crash loop) and get_app to see why, then fix and redeploy, or call rollback_app to return to the last working revision.
 
@@ -63,6 +65,8 @@ const (
 type mcpCaller struct {
 	user  string
 	token string
+	// The address casos was reached by, which new app addresses are named under.
+	host string
 }
 
 type mcpCallerKey struct{}
@@ -93,6 +97,7 @@ func ServeMCP(w http.ResponseWriter, r *http.Request, version string) {
 		http.Error(w, "a casos access token is required: send it as \"Authorization: Bearer <token>\"", http.StatusUnauthorized)
 		return
 	}
+	caller.host = r.Host
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, mcpMaxBodyBytes+1))
 	if err != nil {

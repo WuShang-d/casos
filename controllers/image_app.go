@@ -100,6 +100,8 @@ type imageAppSummary struct {
 	Volumes       []volumeSummary     `json:"volumes"`
 	CreatedAt     string              `json:"createdAt"`
 	Components    []imageAppComponent `json:"components"`
+	GitRepo       string              `json:"gitRepo"`
+	GitCommit     string              `json:"gitCommit"`
 }
 
 // deploymentAppStatus phrases a Deployment's state in the words the app list

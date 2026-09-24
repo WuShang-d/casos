@@ -551,9 +551,15 @@ func appUrls(ing *networkingv1.Ingress, svc *corev1.Service, nodeIP string) []st
 			scheme = "https"
 		}
 		for _, rule := range ing.Spec.Rules {
-			if rule.Host != "" {
-				urls = append(urls, fmt.Sprintf("%s://%s", scheme, rule.Host))
+			if rule.Host == "" {
+				continue
 			}
+			// The app gateway serves these names on the casos port, not on 80.
+			suffix := ""
+			if IsAppGatewayHost(rule.Host) && appGatewayHTTPPort() != 80 {
+				suffix = fmt.Sprintf(":%d", appGatewayHTTPPort())
+			}
+			urls = append(urls, fmt.Sprintf("%s://%s%s", scheme, rule.Host, suffix))
 		}
 	}
 	if svc == nil {
@@ -679,6 +685,8 @@ func appSummaryOf(d appsv1.Deployment, svc *corev1.Service) imageAppSummary {
 		Volumes:       extractVolumes(d),
 		CreatedAt:     d.CreationTimestamp.UTC().Format("2006-01-02 15:04:05"),
 		Components:    []imageAppComponent{},
+		GitRepo:       d.Annotations[gitRepoAnnotation],
+		GitCommit:     d.Annotations[gitCommitAnnotation],
 	}
 	if svc != nil {
 		summary.ServiceType = string(svc.Spec.Type)
@@ -733,6 +741,18 @@ func deleteAppExtras(cfg *rest.Config, namespace, app string) []string {
 			}
 			if err := object.DeleteSecret(cfg, secret.Namespace, secret.Name); err != nil && !errors.IsNotFound(err) {
 				failures = append(failures, fmt.Sprintf("%s (%v)", secret.Name, err))
+			}
+		}
+	}
+
+	// A later app of the same name would otherwise inherit this one's build history.
+	if jobs, err := object.GetJobs(cfg, namespace); err == nil {
+		for _, job := range jobs {
+			if job.Labels[gitBuildLabel] != app {
+				continue
+			}
+			if err := object.DeleteJob(cfg, job.Namespace, job.Name); err != nil && !errors.IsNotFound(err) {
+				failures = append(failures, fmt.Sprintf("%s (%v)", job.Name, err))
 			}
 		}
 	}

@@ -67,6 +67,8 @@ func InitAPI() {
 	beego.Router("/api/get-devbox-runs", &controllers.ApiController{}, "GET:GetDevboxRuns")
 	beego.Router("/api/keep-devbox", &controllers.ApiController{}, "POST:KeepDevbox")
 	beego.Router("/api/get-ai-models", &controllers.ApiController{}, "GET:GetAiModels")
+	beego.Router("/api/deploy-git-app", &controllers.ApiController{}, "POST:DeployGitApp")
+	beego.Router("/api/get-git-builds", &controllers.ApiController{}, "GET:GetGitBuilds")
 
 	beego.Router("/api/get-database-engines", &controllers.ApiController{}, "GET:GetDatabaseEngines")
 	beego.Router("/api/get-databases", &controllers.ApiController{}, "GET:GetDatabases")

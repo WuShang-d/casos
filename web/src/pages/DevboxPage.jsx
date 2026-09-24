@@ -22,6 +22,7 @@ import {SimpleSelect} from "@/components/shared/simple-select";
 import {StatusBadge} from "@/components/shared/status-badge";
 import {CodeBlock, CodeText, DescriptionList} from "@/components/shared/misc";
 import {runAction, useResource} from "@/hooks/use-resource";
+import {nameFromRepo, repoPath} from "@/lib/git";
 import {cn} from "@/lib/utils";
 import {useWorkspace} from "@/hooks/use-workspace";
 
@@ -66,20 +67,6 @@ function expiresIn(expiresAt) {
     : minutes < 48 * 60 ? format.format(Math.round(minutes / 60), "hour")
       : format.format(Math.round(minutes / 1440), "day");
   return i18next.t("devbox:Expires {{when}}", {when: text});
-}
-
-function repoPath(repo) {
-  try {
-    return new URL(repo).pathname.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "") || repo;
-  } catch {
-    return repo;
-  }
-}
-
-// A DNS-1123 name from the repository's last path segment.
-function nameFromRepo(repo) {
-  const last = repoPath(repo).split("/").pop() ?? "";
-  return last.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
 
 const hasSsh = (box) => Boolean(box?.sshHost && box?.sshPort);
