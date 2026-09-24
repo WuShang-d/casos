@@ -116,18 +116,19 @@ type deployDevboxRequest struct {
 }
 
 type devboxSummary struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Image     string `json:"image"`
-	Status    string `json:"status"`
-	Replicas  int32  `json:"replicas"`
-	Ready     int32  `json:"ready"`
-	Url       string `json:"url"`
-	CreatedAt string `json:"createdAt"`
-	SshHost   string `json:"sshHost"`
-	SshPort   int32  `json:"sshPort"`
-	SshUser   string `json:"sshUser"`
-	SshPath   string `json:"sshPath"`
+	Name       string `json:"name"`
+	Namespace  string `json:"namespace"`
+	Image      string `json:"image"`
+	Status     string `json:"status"`
+	Replicas   int32  `json:"replicas"`
+	Ready      int32  `json:"ready"`
+	Url        string `json:"url"`
+	CreatedAt  string `json:"createdAt"`
+	SshHost    string `json:"sshHost"`
+	SshPort    int32  `json:"sshPort"`
+	SshUser    string `json:"sshUser"`
+	SshPath    string `json:"sshPath"`
+	ActiveRuns int    `json:"activeRuns"`
 }
 
 type deployDevboxResult struct {
@@ -249,12 +250,15 @@ func (c *ApiController) GetDevboxes() {
 	}
 
 	nodeIP := clusterNodeIP(cfg)
+	activeRuns := activeDevboxRuns(cfg, namespace)
 	result := []devboxSummary{}
 	for _, d := range deployments {
 		if d.Labels[devboxLabel] != "true" {
 			continue
 		}
-		result = append(result, devboxSummaryOf(cfg, d, nodeIP))
+		summary := devboxSummaryOf(cfg, d, nodeIP)
+		summary.ActiveRuns = activeRuns[d.Namespace+"/"+d.Name]
+		result = append(result, summary)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt > result[j].CreatedAt })
 	c.ResponseOk(result)

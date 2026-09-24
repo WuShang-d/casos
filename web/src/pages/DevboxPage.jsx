@@ -1,16 +1,18 @@
 import React, {useState} from "react";
 import i18next from "i18next";
 import {useTranslation} from "react-i18next";
-import {Code2, ExternalLink, Laptop, Play, Plus, Square, Trash2} from "lucide-react";
+import {Code2, ExternalLink, Laptop, Play, Plus, Rocket, Square, Trash2} from "lucide-react";
 import * as DevboxBackend from "@/backend/DevboxBackend";
 import * as ImageBackend from "@/backend/ImageBackend";
 import * as NamespaceBackend from "@/backend/NamespaceBackend";
+import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/checkbox";
 import {ConfirmDialog} from "@/components/shared/confirm-dialog";
 import {DataTable} from "@/components/shared/data-table";
+import {DevboxRunsSheet} from "@/components/shared/devbox-runs-sheet";
 import {Field, FormDialog} from "@/components/shared/form-dialog";
 import {PageContainer, PageHeader} from "@/components/shared/page-header";
 import {SimpleSelect} from "@/components/shared/simple-select";
@@ -63,6 +65,7 @@ function DevboxPage() {
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState(null);
   const [connectTarget, setConnectTarget] = useState(null);
+  const [runsTarget, setRunsTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteData, setDeleteData] = useState(false);
 
@@ -155,9 +158,16 @@ function DevboxPage() {
       key: "status",
       title: i18next.t("general:Status"),
       dataIndex: "status",
-      width: 120,
+      width: 180,
       sortable: true,
-      render: (value) => <StatusBadge status={value} variants={DEVBOX_STATUS_VARIANTS} />,
+      render: (value, record) => (
+        <div className="flex items-center gap-1.5">
+          <StatusBadge status={value} variants={DEVBOX_STATUS_VARIANTS} />
+          {record.activeRuns > 0 ? (
+            <Badge variant="info">{i18next.t("devbox:{{count}} active", {count: record.activeRuns})}</Badge>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "image",
@@ -183,7 +193,7 @@ function DevboxPage() {
     {
       key: "actions",
       title: i18next.t("general:Action"),
-      width: 240,
+      width: 270,
       align: "right",
       render: (_value, record) => (
         <div className="flex items-center justify-end gap-0.5">
@@ -215,6 +225,19 @@ function DevboxPage() {
             }}
           >
             <Laptop />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={i18next.t("devbox:Runs")}
+            title={i18next.t("devbox:Runs")}
+            data-testid="devbox-runs"
+            onClick={(event) => {
+              event.stopPropagation();
+              setRunsTarget(record);
+            }}
+          >
+            <Rocket />
           </Button>
           {record.status === "stopped" ? (
             <Button
@@ -470,6 +493,13 @@ function DevboxPage() {
         ) : null}
       </FormDialog>
 
+      <DevboxRunsSheet
+        devbox={runsTarget}
+        open={Boolean(runsTarget)}
+        onClose={() => setRunsTarget(null)}
+        onChanged={() => refresh({silent: true})}
+      />
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
@@ -479,7 +509,7 @@ function DevboxPage() {
           }
         }}
         title={`${i18next.t("general:Delete")} ${deleteTarget?.name ?? ""}`}
-        description={i18next.t("devbox:The workspace and its address are removed. Its home disk is kept unless you say otherwise.")}
+        description={i18next.t("devbox:The workspace, its address and its runs are removed. Its home disk is kept unless you say otherwise.")}
         confirmText={i18next.t("general:Delete")}
         onConfirm={remove}
         extra={

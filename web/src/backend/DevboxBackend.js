@@ -16,3 +16,16 @@ export function getDevboxes(namespace = "") {
     credentials: "include", headers: lang(),
   }).then(r => r.json());
 }
+
+export function runDevbox(payload) {
+  return fetch(`${Setting.ServerUrl}/api/run-devbox`, {
+    method: "POST", credentials: "include", headers: jsonHeaders(), body: JSON.stringify(payload),
+  }).then(r => r.json());
+}
+
+export function getDevboxRuns(namespace, devbox) {
+  const params = new URLSearchParams({namespace, devbox});
+  return fetch(`${Setting.ServerUrl}/api/get-devbox-runs?${params}`, {
+    credentials: "include", headers: lang(),
+  }).then(r => r.json());
+}
