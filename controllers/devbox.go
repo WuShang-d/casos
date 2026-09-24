@@ -30,8 +30,7 @@ import (
 const (
 	devboxLabel        = "casos.io/devbox"
 	devboxDefaultImage = "codercom/code-server:latest"
-	// code-server binds this port and reads PASSWORD from the environment; the
-	// official image already serves on 0.0.0.0:8080, so no command is needed.
+	// code-server binds this port and reads PASSWORD from the environment.
 	devboxContainerPort = 8080
 	devboxHomeMount     = "/home/coder"
 	devboxDefaultDisk   = "5Gi"
@@ -79,6 +78,14 @@ mkdir -p "$s" && chmod 700 "$s" || exit 0
 exec >"$s/start.log" 2>&1
 [ -f "$s/host_ed25519" ] || "$d/ssh-keygen" -q -t ed25519 -N "" -f "$s/host_ed25519"
 printf '%s\n' "$CASOS_SSH_PUBLIC_KEY" > "$s/authorized_keys"
+export PATH="/home/coder/.local/bin:$PATH"
+# sshd hands sessions a bare environment, and login shells reset PATH from
+# /etc/profile, so the image's own (conda, CUDA) is replayed for both.
+(unset PASSWORD CASOS_SSH_PUBLIC_KEY HOSTNAME PWD OLDPWD SHLVL; export -p) > "$s/env.sh"
+p=/home/coder/.profile
+if ! grep -qs '.casos/ssh/env.sh' "$p"; then
+  { echo '[ -f "$HOME/.casos/ssh/env.sh" ] && . "$HOME/.casos/ssh/env.sh"'; cat "$p" 2>/dev/null; } > "$s/profile" && cat "$s/profile" > "$p"
+fi
 cat > "$s/sshd_config" <<CFG
 Port 2222
 HostKey $s/host_ed25519
@@ -93,6 +100,16 @@ SshdSessionPath $d/sshd-session
 SshdAuthPath $d/sshd-auth
 Subsystem sftp $d/sftp-server
 CFG
+# sshd honours only the first SetEnv line.
+command -v awk >/dev/null && awk 'BEGIN {
+  line = "SetEnv"
+  for (name in ENVIRON) {
+    value = ENVIRON[name]
+    if (name !~ /^[A-Za-z_][A-Za-z0-9_]*$/ || name ~ /^(PASSWORD|CASOS_SSH_PUBLIC_KEY|HOSTNAME|PWD|OLDPWD|SHLVL|_)$/ || value ~ /[\n\\"]/) continue
+    line = line " \"" name "=" value "\""
+  }
+  print line
+}' >> "$s/sshd_config"
 "$d/sshd" -f "$s/sshd_config" -E "$s/sshd.log"
 exit 0
 `
@@ -100,9 +117,14 @@ exit 0
 type deployDevboxRequest struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
-	// Image overrides the code-server image, for a lab that keeps its own or a
-	// pinned digest; empty uses the default.
+	// Image is the environment: any glibc image, as the editor is brought in.
+	// Empty uses the code-server image itself.
 	Image string `json:"image"`
+	// Repo is cloned into the home disk on first start, and opened as the workspace.
+	Repo   string `json:"repo"`
+	Branch string `json:"branch"`
+	// Setup runs once in the checkout, in the image, before the editor starts.
+	Setup string `json:"setup"`
 	// Password guards the editor. Empty means "generate one", handed back once
 	// so the user can copy it — it is never read back afterwards.
 	Password string `json:"password"`
@@ -129,6 +151,17 @@ type devboxSummary struct {
 	SshUser    string `json:"sshUser"`
 	SshPath    string `json:"sshPath"`
 	ActiveRuns int    `json:"activeRuns"`
+	Folder     string `json:"folder"`
+	Repo       string `json:"repo"`
+	// Read back from the clone step of the current pod.
+	Branch      string `json:"branch"`
+	Commit      string `json:"commit"`
+	CloneError  string `json:"cloneError"`
+	SetupFailed bool   `json:"setupFailed"`
+	// The init container a starting box is on.
+	PrepareStep   string   `json:"prepareStep"`
+	PodName       string   `json:"podName"`
+	LogContainers []string `json:"logContainers"`
 }
 
 type deployDevboxResult struct {
@@ -193,20 +226,32 @@ func (c *ApiController) DeployDevbox() {
 		return
 	}
 
-	envVars := []envVarRequest{{Name: "PASSWORD", Value: password}}
+	env := devboxEnvironment{
+		image:  image,
+		repo:   strings.TrimSpace(req.Repo),
+		branch: strings.TrimSpace(req.Branch),
+		setup:  strings.TrimSpace(req.Setup),
+		folder: devboxHomeMount,
+	}
+	if env.repo != "" {
+		name, err := devboxRepoFolder(env.repo)
+		if err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		env.folder = devboxHomeMount + "/" + name
+	}
+
 	ports := []appPortRequest{{Name: devboxHttpPortName, ContainerPort: devboxContainerPort, Protocol: "TCP"}}
-	opts := workloadOptions{labels: map[string]string{devboxLabel: "true"}}
 	if sshKeys != "" {
-		envVars = append(envVars, envVarRequest{Name: devboxSshKeyEnv, Value: sshKeys})
 		ports = append(ports, appPortRequest{Name: devboxSshPortName, ContainerPort: devboxSshPort, Protocol: "TCP"})
-		opts.mutate = addDevboxSshServer
 	}
 
 	appReq := deployAppRequest{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
 		Image:       image,
-		EnvVars:     envVars,
+		EnvVars:     devboxEnvVars(env, password, sshKeys),
 		Ports:       ports,
 		Volumes:     volumes,
 		ServiceType: "NodePort",
@@ -214,6 +259,11 @@ func (c *ApiController) DeployDevbox() {
 			CpuLimit:    req.CpuLimit,
 			MemoryLimit: req.MemoryLimit,
 		},
+		Command: []string{"/bin/sh", "-c", devboxEditorScript},
+	}
+	opts := workloadOptions{
+		labels: map[string]string{devboxLabel: "true"},
+		mutate: applyDevboxEnvironment(env, sshKeys != ""),
 	}
 
 	if _, err := deployAppWorkload(cfg, appReq, opts); err != nil {
@@ -221,9 +271,9 @@ func (c *ApiController) DeployDevbox() {
 		return
 	}
 
-	summary := devboxSummary{Name: req.Name, Namespace: req.Namespace, Image: image, Status: "pending"}
+	summary := devboxSummary{Name: req.Name, Namespace: req.Namespace, Image: image, Status: "pending", Folder: env.folder, Repo: env.repo}
 	if depl, err := object.GetDeployment(cfg, req.Namespace, req.Name); err == nil {
-		summary = devboxSummaryOf(cfg, *depl, clusterNodeIP(cfg))
+		summary = devboxSummaryOf(cfg, *depl, clusterNodeIP(cfg), nil)
 	}
 
 	c.ResponseOk(deployDevboxResult{devboxSummary: summary, Password: password})
@@ -251,12 +301,13 @@ func (c *ApiController) GetDevboxes() {
 
 	nodeIP := clusterNodeIP(cfg)
 	activeRuns := activeDevboxRuns(cfg, namespace)
+	pods, _ := object.GetPods(cfg, namespace)
 	result := []devboxSummary{}
 	for _, d := range deployments {
 		if d.Labels[devboxLabel] != "true" {
 			continue
 		}
-		summary := devboxSummaryOf(cfg, d, nodeIP)
+		summary := devboxSummaryOf(cfg, d, nodeIP, pods)
 		summary.ActiveRuns = activeRuns[d.Namespace+"/"+d.Name]
 		result = append(result, summary)
 	}
@@ -264,7 +315,7 @@ func (c *ApiController) GetDevboxes() {
 	c.ResponseOk(result)
 }
 
-func devboxSummaryOf(cfg *rest.Config, d appsv1.Deployment, nodeIP string) devboxSummary {
+func devboxSummaryOf(cfg *rest.Config, d appsv1.Deployment, nodeIP string, pods []corev1.Pod) devboxSummary {
 	status, _ := deploymentAppStatus(d)
 	replicas := int32(0)
 	if d.Spec.Replicas != nil {
@@ -278,6 +329,20 @@ func devboxSummaryOf(cfg *rest.Config, d appsv1.Deployment, nodeIP string) devbo
 		Replicas:  replicas,
 		Ready:     d.Status.ReadyReplicas,
 		CreatedAt: d.CreationTimestamp.UTC().Format("2006-01-02 15:04:05"),
+		Folder:    devboxFolder(d),
+		Repo:      d.Annotations[devboxRepoAnnotation],
+	}
+	if status != "stopped" {
+		state := devboxPodStateOf(d, pods)
+		summary.PodName = state.podName
+		summary.Branch = state.branch
+		summary.Commit = state.commit
+		summary.CloneError = state.cloneError
+		summary.SetupFailed = state.setupFailed
+		summary.LogContainers = state.logContainers
+		if status == "pending" {
+			summary.PrepareStep = state.prepareStep
+		}
 	}
 	if svc, err := object.GetService(cfg, d.Namespace, d.Name); err == nil {
 		if host, port := servicePortAddress(svc, nodeIP, devboxHttpPortName); host != "" {
@@ -287,7 +352,7 @@ func devboxSummaryOf(cfg *rest.Config, d appsv1.Deployment, nodeIP string) devbo
 			summary.SshHost = host
 			summary.SshPort = port
 			summary.SshUser = devboxSshUser
-			summary.SshPath = devboxHomeMount
+			summary.SshPath = summary.Folder
 		}
 	}
 	return summary

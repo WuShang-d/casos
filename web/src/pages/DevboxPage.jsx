@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import i18next from "i18next";
 import {useTranslation} from "react-i18next";
-import {Code2, ExternalLink, Laptop, Play, Plus, Rocket, Square, Trash2} from "lucide-react";
+import {ChevronRight, Code2, ExternalLink, GitBranch, Laptop, Play, Plus, Rocket, ScrollText, Square, Trash2} from "lucide-react";
 import * as DevboxBackend from "@/backend/DevboxBackend";
 import * as ImageBackend from "@/backend/ImageBackend";
 import * as NamespaceBackend from "@/backend/NamespaceBackend";
@@ -10,15 +10,19 @@ import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/checkbox";
+import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
 import {ConfirmDialog} from "@/components/shared/confirm-dialog";
 import {DataTable} from "@/components/shared/data-table";
+import {DevboxEnvironmentPicker, presetByKey} from "@/components/shared/devbox-environment";
 import {DevboxRunsSheet} from "@/components/shared/devbox-runs-sheet";
 import {Field, FormDialog} from "@/components/shared/form-dialog";
 import {PageContainer, PageHeader} from "@/components/shared/page-header";
+import {PodLogsSheet} from "@/components/shared/pod-logs-sheet";
 import {SimpleSelect} from "@/components/shared/simple-select";
 import {StatusBadge} from "@/components/shared/status-badge";
 import {CodeBlock, CodeText, DescriptionList} from "@/components/shared/misc";
 import {runAction, useResource} from "@/hooks/use-resource";
+import {cn} from "@/lib/utils";
 import {useWorkspace} from "@/hooks/use-workspace";
 
 const POLL_INTERVAL = 15000;
@@ -30,7 +34,41 @@ const DEVBOX_STATUS_VARIANTS = {
   stopped: "muted",
 };
 
-const emptyForm = (namespace = "default") => ({name: "", namespace, image: "", diskSize: "5Gi", password: "", sshPublicKeys: ""});
+const emptyForm = (namespace = "default") => ({
+  name: "",
+  nameTouched: false,
+  namespace,
+  repo: "",
+  branch: "",
+  preset: "general",
+  image: "",
+  setup: "",
+  diskSize: "5Gi",
+  password: "",
+  sshPublicKeys: "",
+});
+
+const PREPARE_STEPS = {
+  "editor": () => i18next.t("devbox:Installing the editor"),
+  "user": () => i18next.t("devbox:Adding the user"),
+  "ssh-tools": () => i18next.t("devbox:Installing SSH"),
+  "clone": () => i18next.t("devbox:Cloning the repository"),
+  "setup": () => i18next.t("devbox:Running the setup script"),
+};
+
+function repoPath(repo) {
+  try {
+    return new URL(repo).pathname.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "") || repo;
+  } catch {
+    return repo;
+  }
+}
+
+// A DNS-1123 name from the repository's last path segment.
+function nameFromRepo(repo) {
+  const last = repoPath(repo).split("/").pop() ?? "";
+  return last.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
 
 const hasSsh = (box) => Boolean(box?.sshHost && box?.sshPort);
 const sshHostAlias = (box) => `casos-${box.namespace}-${box.name}`;
@@ -66,6 +104,7 @@ function DevboxPage() {
   const [created, setCreated] = useState(null);
   const [connectTarget, setConnectTarget] = useState(null);
   const [runsTarget, setRunsTarget] = useState(null);
+  const [logsTarget, setLogsTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteData, setDeleteData] = useState(false);
 
@@ -78,6 +117,14 @@ function DevboxPage() {
 
   function setField(key, value) {
     setForm((prev) => ({...prev, [key]: value}));
+  }
+
+  function setRepo(repo) {
+    setForm((prev) => ({...prev, repo, name: prev.nameTouched ? prev.name : nameFromRepo(repo)}));
+  }
+
+  function choosePreset(preset) {
+    setForm((prev) => ({...prev, preset: preset.key, image: preset.image, setup: preset.setup}));
   }
 
   function openCreate() {
@@ -95,7 +142,10 @@ function DevboxPage() {
         DevboxBackend.deployDevbox({
           name: form.name.trim(),
           namespace: form.namespace,
+          repo: form.repo.trim(),
+          branch: form.branch.trim(),
           image: form.image.trim(),
+          setup: form.setup.trim(),
           diskSize: form.diskSize.trim(),
           password: form.password.trim(),
           sshPublicKeys: form.sshPublicKeys.trim(),
@@ -142,7 +192,7 @@ function DevboxPage() {
       key: "name",
       title: i18next.t("devbox:DevBox"),
       dataIndex: "name",
-      minWidth: 200,
+      minWidth: 160,
       sortable: true,
       render: (value, record) => (
         <div className="flex items-center gap-2">
@@ -158,11 +208,18 @@ function DevboxPage() {
       key: "status",
       title: i18next.t("general:Status"),
       dataIndex: "status",
-      width: 180,
+      width: 184,
       sortable: true,
       render: (value, record) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <StatusBadge status={value} variants={DEVBOX_STATUS_VARIANTS} />
+          {record.prepareStep ? (
+            <Badge variant="muted">{PREPARE_STEPS[record.prepareStep]?.() ?? record.prepareStep}</Badge>
+          ) : null}
+          {record.cloneError ? (
+            <Badge variant="danger" title={record.cloneError}>{i18next.t("devbox:Clone failed")}</Badge>
+          ) : null}
+          {record.setupFailed ? <Badge variant="danger">{i18next.t("devbox:Setup failed")}</Badge> : null}
           {record.activeRuns > 0 ? (
             <Badge variant="info">{i18next.t("devbox:{{count}} active", {count: record.activeRuns})}</Badge>
           ) : null}
@@ -171,29 +228,43 @@ function DevboxPage() {
     },
     {
       key: "image",
-      title: i18next.t("general:Image"),
+      title: i18next.t("general:Environment"),
       dataIndex: "image",
       minWidth: 180,
       ellipsis: true,
-      render: (value) => <span className="font-mono text-xs">{value}</span>,
-    },
-    {
-      key: "ready",
-      title: i18next.t("launchpad:Copies"),
-      width: 90,
-      render: (_value, record) => <span className="tabular-nums">{record.ready ?? 0} / {record.replicas ?? 0}</span>,
+      render: (value, record) => (
+        <div className="min-w-0">
+          {record.repo ? (
+            <div className="truncate font-medium" title={record.repo}>
+              {repoPath(record.repo)}
+            </div>
+          ) : null}
+          <div className={cn("truncate font-mono text-xs", record.repo && "text-muted-foreground")}>
+            {record.commit ? (
+              <>
+                <GitBranch className="mr-0.5 inline size-3 align-[-2px]" />
+                {record.branch ? `${record.branch} @ ` : ""}
+                {record.commit}
+                {" · "}
+              </>
+            ) : null}
+            {value}
+          </div>
+        </div>
+      ),
     },
     {
       key: "createdAt",
       title: i18next.t("general:Created"),
       dataIndex: "createdAt",
       width: 170,
+      className: "whitespace-nowrap",
       sortable: true,
     },
     {
       key: "actions",
       title: i18next.t("general:Action"),
-      width: 270,
+      width: 280,
       align: "right",
       render: (_value, record) => (
         <div className="flex items-center justify-end gap-0.5">
@@ -225,6 +296,20 @@ function DevboxPage() {
             }}
           >
             <Laptop />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            disabled={!record.podName || !record.logContainers?.length}
+            aria-label={i18next.t("devbox:Environment log")}
+            title={i18next.t("devbox:Environment log")}
+            data-testid="devbox-environment-log"
+            onClick={(event) => {
+              event.stopPropagation();
+              setLogsTarget(record);
+            }}
+          >
+            <ScrollText />
           </Button>
           <Button
             size="icon-sm"
@@ -329,63 +414,87 @@ function DevboxPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title={i18next.t("devbox:New DevBox")}
-        description={i18next.t("devbox:A code-server container, reachable over a node port. Leave a field blank for its default.")}
+        description={i18next.t("devbox:A VS Code workspace in the image you pick, with your repository checked out and its dependencies installed.")}
         onSubmit={submitCreate}
         submitText={i18next.t("general:Create")}
         submitting={submitting}
         submitDisabled={!form.name.trim()}
+        size="lg"
       >
-        <Field label={i18next.t("general:Name")} htmlFor="devbox-name" required>
-          <Input
-            id="devbox-name"
-            value={form.name}
-            onChange={(e) => setField("name", e.target.value)}
-            placeholder="my-devbox"
-            data-testid="devbox-name-input"
-          />
+        <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
+          <Field
+            label={i18next.t("devbox:Repository")}
+            htmlFor="devbox-repo"
+            hint={i18next.t("devbox:A public Git repository, cloned into the home disk on first start. Blank starts an empty workspace.")}
+          >
+            <Input
+              id="devbox-repo"
+              value={form.repo}
+              onChange={(e) => setRepo(e.target.value)}
+              placeholder="https://github.com/owner/project.git"
+              data-testid="devbox-repo-input"
+            />
+          </Field>
+          <Field label={i18next.t("devbox:Branch")} htmlFor="devbox-branch">
+            <Input
+              id="devbox-branch"
+              value={form.branch}
+              onChange={(e) => setField("branch", e.target.value)}
+              placeholder={i18next.t("devbox:Default branch")}
+              disabled={!form.repo.trim()}
+            />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={i18next.t("general:Name")} htmlFor="devbox-name" required>
+            <Input
+              id="devbox-name"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({...prev, name: e.target.value, nameTouched: true}))}
+              placeholder="my-devbox"
+              data-testid="devbox-name-input"
+            />
+          </Field>
+          <Field label={i18next.t("general:Namespace")} htmlFor="devbox-namespace">
+            <SimpleSelect
+              value={form.namespace}
+              onChange={(value) => setField("namespace", value)}
+              options={namespaces.map((item) => ({label: item.name, value: item.name}))}
+              className="w-full"
+            />
+          </Field>
+        </div>
+        <Field label={i18next.t("general:Environment")} hint={presetByKey(form.preset).hint?.()}>
+          <DevboxEnvironmentPicker value={form.preset} onChange={choosePreset} />
         </Field>
-        <Field label={i18next.t("general:Namespace")} htmlFor="devbox-namespace">
-          <SimpleSelect
-            value={form.namespace}
-            onChange={(value) => setField("namespace", value)}
-            options={namespaces.map((item) => ({label: item.name, value: item.name}))}
-            className="w-full"
-          />
-        </Field>
+        {form.preset === "custom" ? (
+          <Field
+            label={i18next.t("general:Image")}
+            htmlFor="devbox-image"
+            hint={i18next.t("devbox:Any glibc-based image, such as a Debian or Ubuntu one. The editor is added to it.")}
+          >
+            <Input
+              id="devbox-image"
+              value={form.image}
+              onChange={(e) => setField("image", e.target.value)}
+              placeholder="registry.example.com/lab/env:1.0"
+              data-testid="devbox-image-input"
+            />
+          </Field>
+        ) : null}
         <Field
-          label={i18next.t("general:Image")}
-          htmlFor="devbox-image"
-          hint={i18next.t("devbox:Defaults to codercom/code-server:latest.")}
+          label={i18next.t("devbox:Setup script")}
+          htmlFor="devbox-setup"
+          hint={i18next.t("devbox:Runs once in the repository folder before the editor opens, as a normal user. Only the home disk survives a restart, so install there: pip and conda already do.")}
         >
-          <Input
-            id="devbox-image"
-            value={form.image}
-            onChange={(e) => setField("image", e.target.value)}
-            placeholder="codercom/code-server:latest"
-          />
-        </Field>
-        <Field
-          label={i18next.t("devbox:Home disk")}
-          htmlFor="devbox-disk"
-          hint={i18next.t("devbox:Keeps /home/coder across restarts. Use 0 for a stateless box.")}
-        >
-          <Input
-            id="devbox-disk"
-            value={form.diskSize}
-            onChange={(e) => setField("diskSize", e.target.value)}
-            placeholder="5Gi"
-          />
-        </Field>
-        <Field
-          label={i18next.t("general:Password")}
-          htmlFor="devbox-password"
-          hint={i18next.t("devbox:Leave blank to have one generated.")}
-        >
-          <Input
-            id="devbox-password"
-            value={form.password}
-            onChange={(e) => setField("password", e.target.value)}
-            placeholder="••••••••"
+          <Textarea
+            id="devbox-setup"
+            rows={3}
+            className="font-mono text-xs"
+            value={form.setup}
+            onChange={(e) => setField("setup", e.target.value)}
+            placeholder="pip install -r requirements.txt"
+            data-testid="devbox-setup-input"
           />
         </Field>
         <Field
@@ -395,7 +504,7 @@ function DevboxPage() {
         >
           <Textarea
             id="devbox-ssh-keys"
-            rows={3}
+            rows={2}
             className="font-mono text-xs"
             value={form.sshPublicKeys}
             onChange={(e) => setField("sshPublicKeys", e.target.value)}
@@ -403,6 +512,38 @@ function DevboxPage() {
             data-testid="devbox-ssh-keys-input"
           />
         </Field>
+        <Collapsible>
+          <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group flex items-center gap-1 text-sm">
+            <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
+            {i18next.t("devbox:Disk and password")}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="grid gap-4 pt-4 sm:grid-cols-2">
+            <Field
+              label={i18next.t("devbox:Home disk")}
+              htmlFor="devbox-disk"
+              hint={i18next.t("devbox:Keeps /home/coder across restarts. Use 0 for a stateless box.")}
+            >
+              <Input
+                id="devbox-disk"
+                value={form.diskSize}
+                onChange={(e) => setField("diskSize", e.target.value)}
+                placeholder="5Gi"
+              />
+            </Field>
+            <Field
+              label={i18next.t("general:Password")}
+              htmlFor="devbox-password"
+              hint={i18next.t("devbox:Leave blank to have one generated.")}
+            >
+              <Input
+                id="devbox-password"
+                value={form.password}
+                onChange={(e) => setField("password", e.target.value)}
+                placeholder="••••••••"
+              />
+            </Field>
+          </CollapsibleContent>
+        </Collapsible>
       </FormDialog>
 
       <FormDialog
@@ -492,6 +633,12 @@ function DevboxPage() {
           </div>
         ) : null}
       </FormDialog>
+
+      <PodLogsSheet
+        pod={logsTarget ? {namespace: logsTarget.namespace, name: logsTarget.podName, containers: logsTarget.logContainers} : null}
+        open={Boolean(logsTarget)}
+        onClose={() => setLogsTarget(null)}
+      />
 
       <DevboxRunsSheet
         devbox={runsTarget}

@@ -27,6 +27,7 @@ const (
 	devboxRunContainer         = "run"
 	devboxRunTTLSeconds        = int32(7 * 24 * 60 * 60)
 	devboxRunTimeFormat        = "2006-01-02 15:04:05"
+	devboxRunPrelude           = `export PATH="$HOME/.local/bin:$PATH"; [ -f "$HOME/.profile" ] && . "$HOME/.profile"` + "\n"
 )
 
 type runDevboxRequest struct {
@@ -186,16 +187,19 @@ func buildDevboxRunJob(depl *appsv1.Deployment, req runDevboxRequest, node strin
 	}
 	editor := source.Containers[0]
 
+	// The tools volumes are filled by init containers a run does not have, and
+	// an /etc/passwd subPath into an empty volume would stop the run starting.
+	editorOnly := func(name string) bool { return name == devboxSshVolume || name == devboxToolsVolume }
 	var mounts []corev1.VolumeMount
 	for _, mount := range editor.VolumeMounts {
-		if mount.Name != devboxSshVolume {
+		if !editorOnly(mount.Name) {
 			mounts = append(mounts, mount)
 		}
 	}
 	var volumes []corev1.Volume
 	hasDisk := false
 	for _, volume := range source.Volumes {
-		if volume.Name == devboxSshVolume {
+		if editorOnly(volume.Name) {
 			continue
 		}
 		hasDisk = hasDisk || volume.PersistentVolumeClaim != nil
@@ -209,9 +213,10 @@ func buildDevboxRunJob(depl *appsv1.Deployment, req runDevboxRequest, node strin
 		Name:            devboxRunContainer,
 		Image:           editor.Image,
 		ImagePullPolicy: editor.ImagePullPolicy,
-		// A login shell, so the PATH set up in ~/.profile (a venv, conda) applies.
-		Command:         []string{"/bin/sh", "-lc", req.Command},
-		WorkingDir:      devboxHomeMount,
+		// Not a login shell, whose /etc/profile would drop the image's PATH;
+		// ~/.profile is still read, for a venv or conda set up there.
+		Command:         []string{"/bin/sh", "-c", devboxRunPrelude + req.Command},
+		WorkingDir:      devboxFolder(*depl),
 		Env:             devboxRunEnv(editor.Env, req.Gpu),
 		EnvFrom:         editor.EnvFrom,
 		VolumeMounts:    mounts,

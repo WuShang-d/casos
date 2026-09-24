@@ -192,7 +192,7 @@ export function DevboxRunsSheet({devbox, open, onClose, onChanged}) {
         open={formOpen}
         onOpenChange={setFormOpen}
         title={i18next.t("devbox:New run")}
-        description={i18next.t("devbox:Runs in /home/coder with a login shell. A failed run is not retried; finished runs are kept for 7 days.")}
+        description={i18next.t("devbox:Runs in the workspace folder, with the same environment as the editor. A failed run is not retried; finished runs are kept for 7 days.")}
         onSubmit={submitRun}
         submitText={i18next.t("devbox:Run")}
         submitting={submitting}
