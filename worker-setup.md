@@ -118,7 +118,7 @@ echo "Windows host IP: $WINDOWS_IP"
 Verify casos is reachable:
 
 ```bash
-curl -s "http://$WINDOWS_IP:20080/api/get-nodes"
+curl -s "http://$WINDOWS_IP:20080/api/health"
 ```
 
 ## 5. Fetch worker kubeconfig from casos
@@ -130,13 +130,22 @@ WINDOWS_IP=$(ip route | grep default | awk '{print $3}')
 
 NODE_NAME=$(hostname)
 
-curl -s "http://$WINDOWS_IP:20080/api/get-worker-kubeconfig?nodeName=$NODE_NAME" | \
+# The kubeconfig is a cluster credential, so casos only returns it to a
+# signed-in session. Use the account you sign in to the web UI with.
+read -rp "casos username: " CASOS_USER
+read -rsp "casos password: " CASOS_PASSWORD; echo
+curl -s -c /tmp/casos.cookies -H "Content-Type: application/json" \
+  -d "{\"username\":\"$CASOS_USER\",\"password\":\"$CASOS_PASSWORD\"}" \
+  "http://$WINDOWS_IP:20080/api/signin" > /dev/null
+
+curl -s -b /tmp/casos.cookies "http://$WINDOWS_IP:20080/api/get-worker-kubeconfig?nodeName=$NODE_NAME" | \
   python3 -c "
 import sys, json
 d = json.load(sys.stdin)
 open('/tmp/worker.kubeconfig', 'w').write(d['data']['kubeconfig'])
 print('ok')
 "
+rm -f /tmp/casos.cookies
 
 sudo mv /tmp/worker.kubeconfig /etc/kubernetes/worker.kubeconfig
 ```
@@ -294,14 +303,7 @@ Check kubelet logs:
 sudo journalctl -u kubelet -n 30 --no-pager
 ```
 
-Query casos for registered nodes:
-
-```bash
-WINDOWS_IP=$(ip route | grep default | awk '{print $3}')
-curl -s "http://$WINDOWS_IP:20080/api/get-nodes" | python3 -m json.tool
-```
-
-The node should appear with `"status": "Ready"` after the Flannel pod on that node becomes Ready.
+Open the Nodes page in the casos web UI. The node should appear with `"status": "Ready"` after the Flannel pod on that node becomes Ready.
 
 ---
 
