@@ -621,11 +621,17 @@
     "status warning": "Warning"
   },
   "node": {
+    "CPU free": "CPU free",
+    "GPUs free": "GPUs free",
     "Last heartbeat": "Last heartbeat",
+    "Memory free": "Memory free",
     "No nodes registered. Add a machine and deploy it as a node from Machines.": "No nodes registered. Add a machine, then deploy it as a node from Machines.",
     "Rejected by the CasOS admission webhook": "Rejected by the CasOS admission webhook",
     "Some nodes are not Ready": "Some nodes are not Ready",
+    "Tainted": "Tainted",
     "The node condition is only the symptom — the kubelet log on the node carries the underlying error.": "The node condition is only the symptom — the kubelet log on the node carries the underlying error.",
+    "Unrequested capacity on Ready, schedulable nodes.": "Unrequested capacity on Ready, schedulable nodes.",
+    "{{requested}} of {{allocatable}} requested": "{{requested}} of {{allocatable}} requested",
     "{{times}} times, last at {{time}}": "{{times}} times, last at {{time}}"
   },
   "onboarding": {

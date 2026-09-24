@@ -1,11 +1,12 @@
 import React, {useState} from "react";
 import i18next from "i18next";
-import {Ban, CheckCircle2, KeyRound, Pencil, RefreshCw, Trash2} from "lucide-react";
+import {Ban, CheckCircle2, Cpu, HardDrive, KeyRound, Pencil, RefreshCw, Trash2, Zap} from "lucide-react";
 import * as NodeBackend from "@/backend/NodeBackend";
 import * as Setting from "@/Setting";
 import {runAction, useResource} from "@/hooks/use-resource";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
+import {Progress} from "@/components/ui/progress";
 import {Textarea} from "@/components/ui/textarea";
 import {MessageAlert} from "@/components/ui/alert";
 import {SimpleTooltip} from "@/components/ui/tooltip";
@@ -16,6 +17,7 @@ import {Field, FormDialog} from "@/components/shared/form-dialog";
 import {PageContainer} from "@/components/shared/page-header";
 import {KeyValueEditor, fromEntries, toEntries} from "@/components/shared/key-value-editor";
 import {CodeText} from "@/components/shared/misc";
+import {StatCard} from "@/components/shared/stat-card";
 
 const STATUS_VARIANTS = {Ready: "success", NotReady: "danger", Unknown: "muted"};
 
@@ -27,6 +29,46 @@ function formatTimestamp(value) {
   }
   const date = new Date(value);
   return isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+const formatCores = (milli) => `${Number((milli / 1000).toFixed(1))} ${i18next.t("general:cores")}`;
+const formatMiB = (mib) => (mib >= 1024 ? `${(mib / 1024).toFixed(1)} GiB` : `${Math.round(mib)} MiB`);
+
+function isSchedulable(node) {
+  return node.status === "Ready" && !node.unschedulable && Boolean(node.allocation);
+}
+
+function AllocationCell({requested, allocatable, free, format}) {
+  if (!allocatable) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const percent = Math.min(100, Math.round((requested * 100) / allocatable));
+  return (
+    <SimpleTooltip title={i18next.t("node:{{requested}} of {{allocatable}} requested", {requested: format(requested), allocatable: format(allocatable)})}>
+      <div className="grid gap-1">
+        <div className="flex items-baseline justify-between gap-2 text-xs tabular-nums">
+          <span className="font-medium">{format(free)}</span>
+          <span className="text-muted-foreground">/ {format(allocatable)}</span>
+        </div>
+        <Progress value={percent} tone={percent >= 90 ? "danger" : percent >= 70 ? "warning" : "default"} className="h-1.5" />
+      </div>
+    </SimpleTooltip>
+  );
+}
+
+function GpuCell({allocation}) {
+  if (!allocation?.gpuAllocatable) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const models = allocation.gpus.map((gpu) => gpu.product || gpu.resource).join(", ");
+  return (
+    <div className="grid gap-0.5">
+      <Badge variant={allocation.gpuFree > 0 ? "success" : "muted"} className="w-fit tabular-nums">
+        {allocation.gpuFree} / {allocation.gpuAllocatable}
+      </Badge>
+      <span className="text-muted-foreground max-w-[12rem] truncate text-xs" title={models}>{models}</span>
+    </div>
+  );
 }
 
 // The node condition never names the request that was rejected, so every denial
@@ -133,6 +175,18 @@ function NodeListPage() {
   }
 
   const notReadyNodes = (nodes ?? []).filter((node) => node.status !== "Ready");
+  const schedulableNodes = (nodes ?? []).filter(isSchedulable);
+  const hasAllocation = (nodes ?? []).some((node) => node.allocation);
+  const hasGpus = (nodes ?? []).some((node) => node.allocation?.gpuAllocatable > 0);
+  const totals = schedulableNodes.reduce(
+    (sum, node) => ({
+      cpuFreeM: sum.cpuFreeM + node.allocation.cpuFreeM,
+      memFreeMi: sum.memFreeMi + node.allocation.memFreeMi,
+      gpuFree: sum.gpuFree + node.allocation.gpuFree,
+      gpuAllocatable: sum.gpuAllocatable + node.allocation.gpuAllocatable,
+    }),
+    {cpuFreeM: 0, memFreeMi: 0, gpuFree: 0, gpuAllocatable: 0}
+  );
 
   const columns = [
     {
@@ -144,6 +198,11 @@ function NodeListPage() {
         <span className="flex items-center gap-2">
           <span className="font-medium">{name}</span>
           {record.unschedulable ? <Badge variant="warning">SchedulingDisabled</Badge> : null}
+          {record.taints?.length > 0 ? (
+            <SimpleTooltip title={record.taints.join(", ")}>
+              <span><Badge variant="muted">{i18next.t("node:Tainted")}</Badge></span>
+            </SimpleTooltip>
+          ) : null}
         </span>
       ),
     },
@@ -194,6 +253,52 @@ function NodeListPage() {
         </div>
       ),
     },
+    ...(hasAllocation
+      ? [
+        {
+          key: "cpu",
+          title: i18next.t("node:CPU free"),
+          dataIndex: "allocation.cpuFreeM",
+          minWidth: 150,
+          sortable: true,
+          render: (_, record) => (
+            <AllocationCell
+              requested={record.allocation?.cpuRequestedM}
+              allocatable={record.allocation?.cpuAllocatableM}
+              free={record.allocation?.cpuFreeM}
+              format={formatCores}
+            />
+          ),
+        },
+        {
+          key: "memory",
+          title: i18next.t("node:Memory free"),
+          dataIndex: "allocation.memFreeMi",
+          minWidth: 150,
+          sortable: true,
+          render: (_, record) => (
+            <AllocationCell
+              requested={record.allocation?.memRequestedMi}
+              allocatable={record.allocation?.memAllocatableMi}
+              free={record.allocation?.memFreeMi}
+              format={formatMiB}
+            />
+          ),
+        },
+      ]
+      : []),
+    ...(hasGpus
+      ? [
+        {
+          key: "gpu",
+          title: i18next.t("node:GPUs free"),
+          dataIndex: "allocation.gpuFree",
+          width: 150,
+          sortable: true,
+          render: (_, record) => <GpuCell allocation={record.allocation} />,
+        },
+      ]
+      : []),
     {key: "kubeletVersion", title: "Kubelet", dataIndex: "kubeletVersion", width: 130, sortable: true},
     {
       key: "osArch",
@@ -270,6 +375,35 @@ function NodeListPage() {
             </>
           }
         />
+      ) : null}
+
+      {schedulableNodes.length > 0 ? (
+        <div className={`grid gap-4 sm:grid-cols-2 ${hasGpus ? "xl:grid-cols-3" : ""}`}>
+          <StatCard
+            label={i18next.t("node:CPU free")}
+            value={formatCores(totals.cpuFreeM)}
+            icon={Cpu}
+            tone="info"
+            hint={i18next.t("node:Unrequested capacity on Ready, schedulable nodes.")}
+          />
+          <StatCard
+            label={i18next.t("node:Memory free")}
+            value={formatMiB(totals.memFreeMi)}
+            icon={HardDrive}
+            tone="info"
+            hint={i18next.t("node:Unrequested capacity on Ready, schedulable nodes.")}
+          />
+          {hasGpus ? (
+            <StatCard
+              label={i18next.t("node:GPUs free")}
+              value={totals.gpuFree}
+              suffix={`/ ${totals.gpuAllocatable}`}
+              icon={Zap}
+              tone={totals.gpuFree > 0 ? "success" : "default"}
+              hint={i18next.t("node:Unrequested capacity on Ready, schedulable nodes.")}
+            />
+          ) : null}
+        </div>
       ) : null}
 
       <DataTable

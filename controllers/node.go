@@ -18,6 +18,7 @@ type nodeSummary struct {
 	Roles           []string          `json:"roles"`
 	Labels          map[string]string `json:"labels"`
 	Unschedulable   bool              `json:"unschedulable"`
+	Taints          []string          `json:"taints"`
 	KubeletVersion  string            `json:"kubeletVersion"`
 	OS              string            `json:"os"`
 	Arch            string            `json:"arch"`
@@ -30,6 +31,8 @@ type nodeSummary struct {
 	// this node's kubelet. The Node object cannot carry that: a kubelet being
 	// denied and a kubelet that died look identical from the API's side.
 	AdmissionDenials []server.AdmissionDenial `json:"admissionDenials,omitempty"`
+
+	Allocation *nodeAllocation `json:"allocation,omitempty"`
 }
 
 // maxNodeDenials bounds what one node contributes to the page. A kubelet locked
@@ -112,6 +115,7 @@ func toNodeSummary(n corev1.Node) nodeSummary {
 		Roles:           roles,
 		Labels:          n.Labels,
 		Unschedulable:   n.Spec.Unschedulable,
+		Taints:          nodeTaints(n),
 		KubeletVersion:  n.Status.NodeInfo.KubeletVersion,
 		OS:              n.Status.NodeInfo.OperatingSystem,
 		Arch:            n.Status.NodeInfo.Architecture,
@@ -135,10 +139,18 @@ func (c *ApiController) GetNodes() {
 		c.ResponseError(err.Error())
 		return
 	}
+	// Allocation is best-effort: a failed pod list must not hide the nodes.
+	var podsByNode map[string][]*corev1.Pod
+	if pods, err := object.GetPods(cfg, ""); err == nil {
+		podsByNode = groupPodsByNode(pods)
+	}
 	result := make([]nodeSummary, 0, len(nodes))
 	for _, n := range nodes {
 		summary := toNodeSummary(n)
 		attachAdmissionDenials(&summary)
+		if podsByNode != nil {
+			summary.Allocation = nodeAllocationOf(n, podsByNode[n.Name])
+		}
 		result = append(result, summary)
 	}
 	c.ResponseOk(result)

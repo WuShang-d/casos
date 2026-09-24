@@ -94,6 +94,7 @@ require (
 	helm.sh/helm/v3 v3.21.2
 	k8s.io/api v1.36.1-k3s1
 	k8s.io/component-base v1.36.1-k3s1
+	k8s.io/component-helpers v0.0.0
 	oras.land/oras-go/v2 v2.6.1
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -314,7 +315,6 @@ require (
 	k8s.io/cli-runtime v0.36.2 // indirect
 	k8s.io/cloud-provider v0.0.0 // indirect
 	k8s.io/cluster-bootstrap v0.0.0 // indirect
-	k8s.io/component-helpers v0.0.0 // indirect
 	k8s.io/controller-manager v0.0.0 // indirect
 	k8s.io/cri-api v0.27.1 // indirect
 	k8s.io/cri-client v0.0.0 // indirect

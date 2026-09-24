@@ -621,11 +621,17 @@
     "status warning": "警告"
   },
   "node": {
+    "CPU free": "空闲 CPU",
+    "GPUs free": "空闲 GPU",
     "Last heartbeat": "最近心跳",
+    "Memory free": "空闲内存",
     "No nodes registered. Add a machine and deploy it as a node from Machines.": "还没有注册节点，请先在机器页添加机器并部署为节点。",
     "Rejected by the CasOS admission webhook": "被 CasOS 准入 webhook 拒绝",
     "Some nodes are not Ready": "部分节点未就绪",
+    "Tainted": "有污点",
     "The node condition is only the symptom — the kubelet log on the node carries the underlying error.": "节点状态只是表象，具体错误请查看该节点上的 kubelet 日志。",
+    "Unrequested capacity on Ready, schedulable nodes.": "就绪且可调度节点上尚未被请求的容量。",
+    "{{requested}} of {{allocatable}} requested": "已请求 {{requested}}，共 {{allocatable}}",
     "{{times}} times, last at {{time}}": "共 {{times}} 次，最近一次 {{time}}"
   },
   "onboarding": {
