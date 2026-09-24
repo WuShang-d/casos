@@ -1,6 +1,7 @@
 import * as React from "react";
 import i18next from "i18next";
-import {Globe, LayoutGrid, LogOut, Moon, PanelLeft, PanelLeftClose, SlidersHorizontal, Sparkles, Sun, User} from "lucide-react";
+import {useHistory} from "react-router-dom";
+import {Bot, Globe, LayoutGrid, LogOut, Moon, PanelLeft, PanelLeftClose, SlidersHorizontal, Sparkles, Sun, User} from "lucide-react";
 import * as Setting from "@/Setting";
 import {Button} from "@/components/ui/button";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
@@ -99,6 +100,8 @@ function LanguageSelect() {
 }
 
 function AccountMenu({account, onOpenAccount, onSignout}) {
+  const history = useHistory();
+  const {resolvePath} = useUiMode();
   if (!account) {
     return null;
   }
@@ -120,6 +123,10 @@ function AccountMenu({account, onOpenAccount, onSignout}) {
         <DropdownMenuItem onClick={onOpenAccount}>
           <User />
           {i18next.t("account:My Account")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => history.push(resolvePath("/agent-access"))}>
+          <Bot />
+          {i18next.t("agent:AI Agents")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={onSignout}>

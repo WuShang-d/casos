@@ -116,18 +116,19 @@ func DeletePod(cfg *rest.Config, namespace, name string) error {
 }
 
 func GetPodLogs(cfg *rest.Config, namespace, name, container string, tailLines int64) (string, error) {
+	opts := corev1.PodLogOptions{Container: container}
+	if tailLines > 0 {
+		opts.TailLines = &tailLines
+	}
+	return GetPodLogsWithOptions(cfg, namespace, name, opts)
+}
+
+func GetPodLogsWithOptions(cfg *rest.Config, namespace, name string, opts corev1.PodLogOptions) (string, error) {
 	client, err := newClient(cfg)
 	if err != nil {
 		return "", err
 	}
-	opts := &corev1.PodLogOptions{}
-	if container != "" {
-		opts.Container = container
-	}
-	if tailLines > 0 {
-		opts.TailLines = &tailLines
-	}
-	req := client.CoreV1().Pods(namespace).GetLogs(name, opts)
+	req := client.CoreV1().Pods(namespace).GetLogs(name, &opts)
 	rc, err := req.Stream(context.Background())
 	if err != nil {
 		return "", err

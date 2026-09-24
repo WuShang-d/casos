@@ -15,6 +15,10 @@ func InitAPI() {
 	beego.Router("/api/update-account", &controllers.ApiController{}, "POST:UpdateAccount")
 	beego.Router("/api/e2e/signin", &controllers.ApiController{}, "POST:E2ESignin")
 
+	beego.Router("/api/get-access-tokens", &controllers.ApiController{}, "GET:GetAccessTokens")
+	beego.Router("/api/add-access-token", &controllers.ApiController{}, "POST:AddAccessToken")
+	beego.Router("/api/delete-access-token", &controllers.ApiController{}, "POST:DeleteAccessToken")
+
 	beego.Router("/api/get-pods", &controllers.ApiController{}, "GET:GetPods")
 	beego.Router("/api/get-pod", &controllers.ApiController{}, "GET:GetPod")
 	beego.Router("/api/get-pod-events", &controllers.ApiController{}, "GET:GetPodEvents")

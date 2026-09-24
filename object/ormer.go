@@ -225,6 +225,7 @@ func (a *Ormer) createTable() {
 		new(TrivyScanResult),
 		new(HelmRepo),
 		new(User),
+		new(AccessToken),
 	); err != nil {
 		panic(fmt.Errorf("sync database schema: %w", err))
 	}

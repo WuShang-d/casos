@@ -165,15 +165,22 @@ func (c *ApiController) GetImageApps() {
 	if namespace == "all" {
 		namespace = ""
 	}
-	deployments, err := object.GetDeployments(cfg, namespace)
+	result, err := listImageApps(cfg, namespace)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
 	}
+	c.ResponseOk(result)
+}
+
+func listImageApps(cfg *rest.Config, namespace string) ([]imageAppSummary, error) {
+	deployments, err := object.GetDeployments(cfg, namespace)
+	if err != nil {
+		return nil, err
+	}
 	services, err := object.GetServices(cfg, namespace)
 	if err != nil {
-		c.ResponseError(err.Error())
-		return
+		return nil, err
 	}
 	serviceByKey := map[string]corev1.Service{}
 	for _, svc := range services {
@@ -233,7 +240,7 @@ func (c *ApiController) GetImageApps() {
 		}
 		return result[i].Name < result[j].Name
 	})
-	c.ResponseOk(result)
+	return result, nil
 }
 
 func servicePortsFor(ports []appPortRequest) []portRequest {

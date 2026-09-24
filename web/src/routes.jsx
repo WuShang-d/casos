@@ -51,6 +51,7 @@ const DatabaseEditPage = lazy(() => import("@/pages/DatabaseEditPage"));
 const DatabaseDetailPage = lazy(() => import("@/pages/DatabaseDetailPage"));
 const TemplateDeployPage = lazy(() => import("@/pages/TemplateDeployPage"));
 const TemplateInstancePage = lazy(() => import("@/pages/TemplateInstancePage"));
+const AgentAccessPage = lazy(() => import("@/pages/AgentAccessPage"));
 
 // Simple mode's combined pages. They are routes of their own rather than a
 // rendering mode of the pages they wrap, so a link keeps working after a switch
@@ -133,6 +134,7 @@ export function AppRoutes({account, accountUpdatedAt, onOpenAccount, onUpdateSit
         <Redirect exact from="/templates" to="/app-store/templates" />
         <Route exact path="/templates/instances/:namespace/:name" component={TemplateInstancePage} />
         <Route exact path="/templates/:name" component={TemplateDeployPage} />
+        <Route exact path="/agent-access" component={AgentAccessPage} />
 
         {/* Simple mode's own addresses. Each one renders the simplified screen
             whatever the reader last switched to, so a shared link opens the
@@ -157,6 +159,7 @@ export function AppRoutes({account, accountUpdatedAt, onOpenAccount, onUpdateSit
         <Route exact path="/simple/databases/:namespace/:name/edit" component={DatabaseEditPage} />
         <Route exact path="/simple/devices" render={(props) => <DevicesPage account={account} {...props} />} />
         <Route exact path="/simple/health" component={HealthPage} />
+        <Route exact path="/simple/agent-access" component={AgentAccessPage} />
         <Redirect exact from="/devices" to="/simple/devices" />
         <Redirect exact from="/health" to="/simple/health" />
 

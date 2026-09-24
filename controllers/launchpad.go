@@ -763,46 +763,49 @@ func (c *ApiController) GetImageApp() {
 		return
 	}
 
-	deployment, err := object.GetDeployment(cfg, namespace, name)
+	detail, err := getImageAppDetail(cfg, namespace, name)
 	if err != nil {
 		c.ResponseError(err.Error())
 		return
 	}
+	c.ResponseOk(detail)
+}
+
+func getImageAppDetail(cfg *rest.Config, namespace, name string) (*imageAppDetail, error) {
+	deployment, err := object.GetDeployment(cfg, namespace, name)
+	if err != nil {
+		return nil, err
+	}
 	if len(deployment.Spec.Template.Spec.Containers) == 0 {
-		c.ResponseError(fmt.Sprintf("app %s/%s has no containers", namespace, name))
-		return
+		return nil, fmt.Errorf("app %s/%s has no containers", namespace, name)
 	}
 	container := deployment.Spec.Template.Spec.Containers[0]
 
 	svc, err := object.GetService(cfg, namespace, name)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			c.ResponseError(err.Error())
-			return
+			return nil, err
 		}
 		svc = nil
 	}
 	ing, err := object.GetIngress(cfg, namespace, name)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			c.ResponseError(err.Error())
-			return
+			return nil, err
 		}
 		ing = nil
 	}
 	hpa, err := object.GetHPA(cfg, namespace, name)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			c.ResponseError(err.Error())
-			return
+			return nil, err
 		}
 		hpa = nil
 	}
 	cm, err := object.GetConfigMap(cfg, namespace, appConfigMapName(name))
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			c.ResponseError(err.Error())
-			return
+			return nil, err
 		}
 		cm = nil
 	}
@@ -824,7 +827,7 @@ func (c *ApiController) GetImageApp() {
 		Urls:            appUrls(ing, svc, clusterNodeIP(cfg)),
 		Pods:            appPodsOf(cfg, namespace, name),
 	}
-	c.ResponseOk(detail)
+	return &detail, nil
 }
 
 // registryServerOf reads the address out of a pull secret so the form can show

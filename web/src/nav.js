@@ -1,6 +1,7 @@
 import {
   Activity,
   AppWindow,
+  Bot,
   Boxes,
   ClipboardList,
   Code2,
@@ -111,7 +112,10 @@ export const navGroups = [
     key: "/admin",
     label: "general:Admin",
     icon: ClipboardList,
-    children: [{key: "/sites", label: "general:Sites", path: "/sites/site-built-in"}],
+    children: [
+      {key: "/sites", label: "general:Sites", path: "/sites/site-built-in"},
+      {key: "/agent-access", label: "agent:AI Agents", path: "/agent-access"},
+    ],
   },
 ];
 
@@ -142,6 +146,7 @@ export const simpleNavGroups = [
   {key: "/simple/databases", label: "database:Databases", icon: Database, path: "/simple/databases"},
   {key: "/simple/devices", label: "simple:Devices", icon: Laptop, path: "/simple/devices"},
   {key: "/simple/health", label: "simple:Health", icon: Activity, path: "/simple/health"},
+  {key: "/simple/agent-access", label: "agent:AI Agents", icon: Bot, path: "/simple/agent-access"},
 ];
 
 export function getNavGroups(mode) {
@@ -186,6 +191,7 @@ const MODE_COUNTERPARTS = [
   ["/nodes", "/simple/devices"],
   ["/monitor", "/simple/health"],
   ["/log-search", "/simple/health"],
+  ["/agent-access", "/simple/agent-access"],
 ];
 
 export function homePath(mode) {

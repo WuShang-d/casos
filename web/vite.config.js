@@ -30,6 +30,7 @@ export default defineConfig({
       "/api": {target: backendTarget, changeOrigin: true, ws: true},
       "/k8s": {target: backendTarget, changeOrigin: true, ws: true},
       "/.well-known": {target: backendTarget, changeOrigin: true},
+      "/mcp": {target: backendTarget, changeOrigin: true},
     },
   },
   build: {
