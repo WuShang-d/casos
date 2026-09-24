@@ -410,6 +410,7 @@ func (c *ApiController) UpgradeImageApp() {
 		podVolumes = append(podVolumes, *configVolume)
 		mounts = append(mounts, configMounts...)
 	}
+	podVolumes, mounts = keepInitContainerVolumes(existing.Spec.Template.Spec, *container, podVolumes, mounts)
 	container.VolumeMounts = mounts
 	existing.Spec.Template.Spec.Volumes = podVolumes
 	applyImagePullSecret(&existing.Spec.Template.Spec, pullSecret)
@@ -424,6 +425,31 @@ func (c *ApiController) UpgradeImageApp() {
 		return
 	}
 	c.ResponseOk(toDeploymentSummary(*updated))
+}
+
+// The form knows nothing of init containers and leaves them in place, so the
+// volumes they share with the app, such as a DevBox's SSH tools, stay too.
+func keepInitContainerVolumes(spec corev1.PodSpec, container corev1.Container, volumes []corev1.Volume, mounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount) {
+	shared := map[string]bool{}
+	for _, init := range spec.InitContainers {
+		for _, mount := range init.VolumeMounts {
+			shared[mount.Name] = true
+		}
+	}
+	for _, volume := range volumes {
+		delete(shared, volume.Name)
+	}
+	for _, volume := range spec.Volumes {
+		if shared[volume.Name] {
+			volumes = append(volumes, volume)
+		}
+	}
+	for _, mount := range container.VolumeMounts {
+		if shared[mount.Name] {
+			mounts = append(mounts, mount)
+		}
+	}
+	return volumes, mounts
 }
 
 type uninstallImageAppRequest struct {

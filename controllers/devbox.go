@@ -4,10 +4,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
+	"golang.org/x/crypto/ssh"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 
 	"github.com/casosorg/casos/object"
@@ -32,7 +35,67 @@ const (
 	devboxContainerPort = 8080
 	devboxHomeMount     = "/home/coder"
 	devboxDefaultDisk   = "5Gi"
+	devboxHttpPortName  = "http"
+
+	devboxSshPortName = "ssh"
+	devboxSshPort     = 2222
+	devboxSshUser     = "coder"
+	devboxSshKeyEnv   = "CASOS_SSH_PUBLIC_KEY"
+	devboxSshVolume   = "casos-ssh"
+	// Pinned: the copy script names files inside this image. The scripts
+	// below also spell out /opt/casos-ssh and /home/coder literally.
+	devboxSshImage = "lscr.io/linuxserver/openssh-server:10.3_p1-r1-ls237"
+	devboxSshTools = "/opt/casos-ssh"
 )
+
+// sshd runs inside the workspace container, so a Remote-SSH session gets the
+// image's own shell and tools. It is Alpine's build, carried in with its musl
+// loader and libraries, so it runs whatever libc the workspace image uses.
+const devboxSshCopyScript = `set -e
+d=/opt/casos-ssh
+mkdir -p "$d/lib"
+cp /lib/ld-musl-*.so.1 "$d/ld-musl"
+cp /usr/sbin/sshd.pam "$d/sshd.bin"
+cp /usr/lib/ssh/sshd-session.pam "$d/sshd-session.bin"
+cp /usr/lib/ssh/sshd-auth.pam "$d/sshd-auth.bin"
+cp /usr/lib/ssh/sftp-server "$d/sftp-server.bin"
+cp /usr/bin/ssh-keygen "$d/ssh-keygen.bin"
+for bin in "$d"/*.bin; do
+  ldd "$bin" | awk '$2 == "=>" && $3 !~ /ld-musl/ {print $3}'
+done | sort -u | while read -r lib; do cp -L "$lib" "$d/lib/"; done
+for bin in "$d"/*.bin; do
+  printf '#!/bin/sh\nexec %s/ld-musl --library-path %s/lib %s "$@"\n' "$d" "$d" "$bin" > "${bin%.bin}"
+  chmod 755 "${bin%.bin}"
+done
+`
+
+// Runs as the workspace user from a postStart hook, which leaves the image's
+// own entrypoint alone. It always exits 0: a broken sshd must not take the
+// editor down with it. The host key lives on the home disk, so a restart does
+// not trip a changed-host-key warning.
+const devboxSshStartScript = `d=/opt/casos-ssh
+s=/home/coder/.casos/ssh
+mkdir -p "$s" && chmod 700 "$s" || exit 0
+exec >"$s/start.log" 2>&1
+[ -f "$s/host_ed25519" ] || "$d/ssh-keygen" -q -t ed25519 -N "" -f "$s/host_ed25519"
+printf '%s\n' "$CASOS_SSH_PUBLIC_KEY" > "$s/authorized_keys"
+cat > "$s/sshd_config" <<CFG
+Port 2222
+HostKey $s/host_ed25519
+AuthorizedKeysFile $s/authorized_keys
+PidFile none
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+StrictModes no
+X11Forwarding no
+SshdSessionPath $d/sshd-session
+SshdAuthPath $d/sshd-auth
+Subsystem sftp $d/sftp-server
+CFG
+"$d/sshd" -f "$s/sshd_config" -E "$s/sshd.log"
+exit 0
+`
 
 type deployDevboxRequest struct {
 	Namespace string `json:"namespace"`
@@ -45,9 +108,11 @@ type deployDevboxRequest struct {
 	Password string `json:"password"`
 	// DiskSize is the home volume; empty uses the default, "0" keeps the box
 	// stateless (no disk, so a restart is a clean slate).
-	DiskSize    string  `json:"diskSize"`
-	CpuLimit    *string `json:"cpuLimit"`
-	MemoryLimit *string `json:"memoryLimit"`
+	DiskSize string `json:"diskSize"`
+	// SshPublicKeys, one per line, also open the box to Remote-SSH.
+	SshPublicKeys string  `json:"sshPublicKeys"`
+	CpuLimit      *string `json:"cpuLimit"`
+	MemoryLimit   *string `json:"memoryLimit"`
 }
 
 type devboxSummary struct {
@@ -59,6 +124,10 @@ type devboxSummary struct {
 	Ready     int32  `json:"ready"`
 	Url       string `json:"url"`
 	CreatedAt string `json:"createdAt"`
+	SshHost   string `json:"sshHost"`
+	SshPort   int32  `json:"sshPort"`
+	SshUser   string `json:"sshUser"`
+	SshPath   string `json:"sshPath"`
 }
 
 type deployDevboxResult struct {
@@ -117,16 +186,27 @@ func (c *ApiController) DeployDevbox() {
 		volumes = []volumeRequest{{MountPath: devboxHomeMount, Size: size}}
 	}
 
+	sshKeys, err := normalizeSshPublicKeys(req.SshPublicKeys)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	envVars := []envVarRequest{{Name: "PASSWORD", Value: password}}
+	ports := []appPortRequest{{Name: devboxHttpPortName, ContainerPort: devboxContainerPort, Protocol: "TCP"}}
+	opts := workloadOptions{labels: map[string]string{devboxLabel: "true"}}
+	if sshKeys != "" {
+		envVars = append(envVars, envVarRequest{Name: devboxSshKeyEnv, Value: sshKeys})
+		ports = append(ports, appPortRequest{Name: devboxSshPortName, ContainerPort: devboxSshPort, Protocol: "TCP"})
+		opts.mutate = addDevboxSshServer
+	}
+
 	appReq := deployAppRequest{
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		Image:     image,
-		EnvVars:   []envVarRequest{{Name: "PASSWORD", Value: password}},
-		Ports: []appPortRequest{{
-			Name:          "http",
-			ContainerPort: devboxContainerPort,
-			Protocol:      "TCP",
-		}},
+		Namespace:   req.Namespace,
+		Name:        req.Name,
+		Image:       image,
+		EnvVars:     envVars,
+		Ports:       ports,
 		Volumes:     volumes,
 		ServiceType: "NodePort",
 		resourceRequest: resourceRequest{
@@ -135,7 +215,7 @@ func (c *ApiController) DeployDevbox() {
 		},
 	}
 
-	if _, err := deployAppWorkload(cfg, appReq, map[string]string{devboxLabel: "true"}); err != nil {
+	if _, err := deployAppWorkload(cfg, appReq, opts); err != nil {
 		c.ResponseError(err.Error())
 		return
 	}
@@ -196,14 +276,104 @@ func devboxSummaryOf(cfg *rest.Config, d appsv1.Deployment, nodeIP string) devbo
 		CreatedAt: d.CreationTimestamp.UTC().Format("2006-01-02 15:04:05"),
 	}
 	if svc, err := object.GetService(cfg, d.Namespace, d.Name); err == nil {
-		summary.Url = firstUrl(appUrls(nil, svc, nodeIP))
+		if host, port := servicePortAddress(svc, nodeIP, devboxHttpPortName); host != "" {
+			summary.Url = fmt.Sprintf("http://%s:%d", urlHost(host), port)
+		}
+		if host, port := servicePortAddress(svc, nodeIP, devboxSshPortName); host != "" {
+			summary.SshHost = host
+			summary.SshPort = port
+			summary.SshUser = devboxSshUser
+			summary.SshPath = devboxHomeMount
+		}
 	}
 	return summary
 }
 
-func firstUrl(urls []string) string {
-	if len(urls) == 0 {
-		return ""
+// servicePortAddress looks a port up by name, as the API server does not keep
+// the order ports were declared in.
+func servicePortAddress(svc *corev1.Service, nodeIP, name string) (string, int32) {
+	for _, port := range svc.Spec.Ports {
+		if port.Name != name {
+			continue
+		}
+		switch svc.Spec.Type {
+		case corev1.ServiceTypeNodePort:
+			if nodeIP != "" && port.NodePort != 0 {
+				return nodeIP, port.NodePort
+			}
+		case corev1.ServiceTypeLoadBalancer:
+			for _, ingress := range svc.Status.LoadBalancer.Ingress {
+				if ingress.IP != "" {
+					return ingress.IP, port.Port
+				}
+				if ingress.Hostname != "" {
+					return ingress.Hostname, port.Port
+				}
+			}
+		default:
+			if svc.Spec.ClusterIP != "" && svc.Spec.ClusterIP != corev1.ClusterIPNone {
+				return svc.Spec.ClusterIP, port.Port
+			}
+		}
 	}
-	return urls[0]
+	return "", 0
+}
+
+func urlHost(host string) string {
+	if strings.Contains(host, ":") {
+		return "[" + host + "]"
+	}
+	return host
+}
+
+// Each key is re-marshalled, so options such as command="..." and anything
+// that is not a public key never reach authorized_keys.
+func normalizeSshPublicKeys(text string) (string, error) {
+	var keys []string
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
+		if err != nil {
+			return "", fmt.Errorf("that is not an SSH public key: paste the contents of a .pub file, such as ~/.ssh/id_ed25519.pub, never the private key")
+		}
+		entry := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key)))
+		if comment = strings.Join(strings.Fields(comment), " "); comment != "" {
+			entry += " " + comment
+		}
+		keys = append(keys, entry)
+	}
+	return strings.Join(keys, "\n"), nil
+}
+
+func addDevboxSshServer(depl *appsv1.Deployment) error {
+	spec := &depl.Spec.Template.Spec
+	if len(spec.Containers) == 0 {
+		return fmt.Errorf("the workspace has no container to run SSH in")
+	}
+	editor := &spec.Containers[0]
+	tools := corev1.VolumeMount{Name: devboxSshVolume, MountPath: devboxSshTools}
+
+	spec.Volumes = append(spec.Volumes, corev1.Volume{
+		Name:         devboxSshVolume,
+		VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+	})
+	spec.InitContainers = append(spec.InitContainers, corev1.Container{
+		Name:         "ssh-tools",
+		Image:        devboxSshImage,
+		Command:      []string{"/bin/sh", "-c", devboxSshCopyScript},
+		VolumeMounts: []corev1.VolumeMount{tools},
+		// Same as the editor, so a quota that requires limits still admits the pod.
+		Resources: editor.Resources,
+	})
+	tools.ReadOnly = true
+	editor.VolumeMounts = append(editor.VolumeMounts, tools)
+	editor.Lifecycle = &corev1.Lifecycle{
+		PostStart: &corev1.LifecycleHandler{
+			Exec: &corev1.ExecAction{Command: []string{"/bin/sh", "-c", devboxSshStartScript}},
+		},
+	}
+	return nil
 }
