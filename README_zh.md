@@ -2,7 +2,10 @@
 
 # CasOS
 
-**基于 Kubernetes 构建的云操作系统**
+### 一个文件，拥有你自己的云：跑应用、跑大模型、给 AI Agent 用。
+
+下载一个文件，双击运行。你的笔记本、游戏电脑或服务器上就有了一个真正的 Kubernetes
+集群，自带 Web 界面和应用商店。Windows 也能用。不用写 YAML，也不需要现成的集群。
 
 [![Build](https://github.com/casosorg/casos/workflows/Build/badge.svg?style=flat-square)](https://github.com/casosorg/casos/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/casosorg/casos?style=flat-square&color=4f46e5)](https://github.com/casosorg/casos/releases/latest)
@@ -11,7 +14,7 @@
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square)](https://github.com/casosorg/casos/releases/latest)
 [![Discord](https://img.shields.io/discord/1022748306096537660?logo=discord&label=discord&color=5865F2&style=flat-square)](https://discord.gg/6ma4BAmV7P)
 
-**官网：[casos.net](https://www.casos.net) · 在线演示：[demo.casos.net](https://demo.casos.net)**
+**[官网](https://www.casos.net) · [在线演示](https://demo.casos.net) · [快速开始](#快速开始)**
 
 **[English](README.md) | 简体中文**
 
@@ -19,9 +22,27 @@
 
 ---
 
-CasOS 是一个基于 Kubernetes 构建的云操作系统。它**内嵌**了 Kubernetes API Server、
-Controller Manager 和 Scheduler，因此你不需要现成的集群、不需要控制平面，也不需要写
-一行 YAML。下载一个文件，运行它，你就拥有了一个带 Web 界面和应用商店的可用集群。
+| | |
+|---|---|
+| 🚀 **一个文件，一分钟** | Kubernetes API Server、Controller Manager 和 Scheduler 都内嵌在一个可执行文件里。运行它的机器会自动成为工作节点。在 Windows 上，节点运行在 WSL 里；没有 WSL 的话 CasOS 会自动安装。 |
+| 🧠 **用自己的显卡跑私有 AI** | 一键装好 Ollama 和 Open WebUI，并按显存自动挑选能装下的最大模型，比如 Qwen 3、DeepSeek R1、Gemma 3 或 gpt-oss。模型跑在你的 NVIDIA 显卡上，数据不出本机。 |
+| 🤖 **AI Agent 能直接操作的云** | 内置 MCP Server，Claude Code、Cursor、Codex 可以直接部署应用、查看日志、回滚版本。一切都跑在你自己的机器上。 |
+| 🛠️ **带 GPU 的开发环境** | DevBox 提供浏览器里的 VS Code，也支持桌面版 VS Code 通过 SSH 连接。可以从任意 Git 仓库、任意镜像启动，并在 GPU 上跑任务。 |
+| 📦 **开箱即满的应用商店** | 直接安装 sealos 模板市场和 Helm Chart 里的应用。托管数据库自带备份和控制台。 |
+
+**一条命令接入你的 AI Agent：**
+
+```bash
+claude mcp add --transport http --scope user casos http://localhost:20080/mcp --header "Authorization: Bearer <token>"
+```
+
+打开右上角账号菜单 → **AI Agents** 创建 token。那个页面也有 Cursor、Codex 和其他
+MCP 客户端的现成配置。
+
+**和其他项目的区别。** k3s、minikube 只给你一个集群；CasOS 在此之上还带界面、应用
+商店、私有 AI 和 Agent 接入，并且能在 Windows 上原生运行。Coolify、CasaOS 在 Docker
+上提供一键应用；CasOS 提供同样的体验，但底层是真正的 Kubernetes，通过 SSH 添加机器
+就能扩展。
 
 ## 快速开始
 

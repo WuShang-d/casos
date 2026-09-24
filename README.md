@@ -2,7 +2,11 @@
 
 # CasOS
 
-**A cloud operating system built on Kubernetes**
+### Your own cloud in one file: for apps, AI models and AI agents.
+
+Download one file and double-click it. You get a real Kubernetes cluster with a web
+UI and an app store, on your laptop, your gaming PC or your server. It works on
+Windows too. You need no YAML and no existing cluster.
 
 [![Build](https://github.com/casosorg/casos/workflows/Build/badge.svg?style=flat-square)](https://github.com/casosorg/casos/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/casosorg/casos?style=flat-square&color=4f46e5)](https://github.com/casosorg/casos/releases/latest)
@@ -11,7 +15,7 @@
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square)](https://github.com/casosorg/casos/releases/latest)
 [![Discord](https://img.shields.io/discord/1022748306096537660?logo=discord&label=discord&color=5865F2&style=flat-square)](https://discord.gg/6ma4BAmV7P)
 
-**Website: [casos.net](https://www.casos.net) · Live demo: [demo.casos.net](https://demo.casos.net)**
+**[Website](https://www.casos.net) · [Live demo](https://demo.casos.net) · [Quick start](#quick-start)**
 
 **English | [简体中文](README_zh.md)**
 
@@ -19,10 +23,27 @@
 
 ---
 
-CasOS is a cloud operating system built on Kubernetes. It **embeds** the Kubernetes
-API server, controller manager and scheduler, so you do not need an existing
-cluster, a control plane, or a single line of YAML. Download one file, run it, and
-you have a working cluster with a web UI and an app store.
+| | |
+|---|---|
+| 🚀 **One file, one minute** | The Kubernetes API server, controller manager and scheduler are embedded in a single binary. The machine you start it on becomes a worker node. On Windows that node runs in WSL, and CasOS installs WSL for you if it is missing. |
+| 🧠 **Private AI on your own GPU** | One click installs Ollama and Open WebUI and picks the largest model that fits your GPU memory, such as Qwen 3, DeepSeek R1, Gemma 3 or gpt-oss. It runs on your NVIDIA card, and nothing leaves the machine. |
+| 🤖 **A cloud your AI agents can drive** | The built-in MCP server lets Claude Code, Cursor and Codex deploy apps, read their logs and roll them back. Everything runs on your hardware. |
+| 🛠️ **Dev environments with a GPU** | DevBoxes give you VS Code in the browser, or desktop VS Code over SSH. Start one from any Git repo in any image, and run jobs on the GPU. |
+| 📦 **An app store that's already full** | Install apps from the sealos template catalogue and Helm charts. Managed databases come with backups and a console. |
+
+**Connect your AI agent with one command:**
+
+```bash
+claude mcp add --transport http --scope user casos http://localhost:20080/mcp --header "Authorization: Bearer <token>"
+```
+
+To create the token, open the account menu → **AI Agents**. That page also has
+ready-made snippets for Cursor, Codex and any other MCP client.
+
+**How it compares.** k3s and minikube give you a cluster. CasOS adds the UI, the app
+store, private AI and agent access, and it runs natively on Windows. Coolify and
+CasaOS give you one-click apps on Docker. CasOS gives you the same experience on
+real Kubernetes, so you can grow it by adding machines over SSH.
 
 ## Quick start
 
