@@ -177,7 +177,7 @@ func main() {
 	if util.StartedByDoubleClick() {
 		go openWhenReady(port)
 	}
-	beego.RunWithMiddleWares(fmt.Sprintf(":%v", port), routers.AppGateway, routers.MCP(version))
+	beego.RunWithMiddleWares(fmt.Sprintf(":%v", port), routers.AppGateway, routers.MCP(version), routers.AIGateway)
 }
 
 // defaultHTTPPort is where the web UI and the REST API listen when nothing

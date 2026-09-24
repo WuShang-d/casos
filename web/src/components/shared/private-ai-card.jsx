@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from "react";
 import {useHistory} from "react-router-dom";
 import {useTranslation} from "react-i18next";
-import {Cpu, ExternalLink, Loader2, Settings2, Sparkles, TriangleAlert, Zap} from "lucide-react";
+import {Braces, Cpu, ExternalLink, Loader2, Settings2, Sparkles, TriangleAlert, Zap} from "lucide-react";
 import * as TemplateBackend from "@/backend/TemplateBackend";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
@@ -218,6 +218,12 @@ export function PrivateAiCard() {
               <Settings2 />
               {t("privateAi:Manage")}
             </Button>
+            {progress.ready ? (
+              <Button variant="ghost" onClick={() => history.push(resolvePath("/agent-access"))}>
+                <Braces />
+                {t("privateAi:Use from other apps")}
+              </Button>
+            ) : null}
           </>
         ) : (
           <>

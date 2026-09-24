@@ -19,6 +19,7 @@
     "Signing in...": "Signing in..."
   },
   "agent": {
+    "A model on several machines answers from the least busy one.": "A model on several machines answers from the least busy one.",
     "A token acts as you. Give each agent or machine its own, and revoke the ones you no longer use.": "A token acts as you. Give each agent or machine its own, and revoke the ones you no longer use.",
     "AI Agents": "AI Agents",
     "Access tokens": "Access tokens",
@@ -26,16 +27,20 @@
     "Add to ~/.cursor/mcp.json, or .cursor/mcp.json in a project.": "Add to ~/.cursor/mcp.json, or .cursor/mcp.json in a project.",
     "Agents using it lose access to casos at once.": "Agents using it lose access to casos at once.",
     "Any MCP client that speaks Streamable HTTP works. Point it at the URL and send the token as a bearer token.": "Any MCP client that speaks Streamable HTTP works. Point it at the URL and send the token as a bearer token.",
+    "Base URL": "Base URL",
     "Connect an agent": "Connect an agent",
     "Copy it now": "Copy it now",
     "Create a token below, then add this address to your agent as an MCP server": "Create a token below, then add this address to your agent as an MCP server",
     "Create token": "Create token",
     "Deploy {{image}} to my casos as \"shop\" on port 3000": "Deploy {{image}} to my casos as \"shop\" on port 3000",
+    "From another computer, use this machine's network address instead of localhost.": "From another computer, use this machine's network address instead of localhost.",
     "Last used": "Last used",
     "Let Claude Code, Cursor, Codex and other MCP clients deploy to casos, read app logs, roll back, and run code in sandboxes on your own machines.": "Let Claude Code, Cursor, Codex and other MCP clients deploy to casos, read app logs, roll back, and run code in sandboxes on your own machines.",
     "Name is required": "Name is required",
     "Never": "Never",
+    "No models yet. Install Private AI to run a model on your GPU, and it shows up here.": "No models yet. Install Private AI to run a model on your GPU, and it shows up here.",
     "No tokens yet": "No tokens yet",
+    "Open the App Store": "Open the App Store",
     "Other clients": "Other clients",
     "Revoke": "Revoke",
     "Revoke this token?": "Revoke this token?",
@@ -47,7 +52,9 @@
     "Token": "Token",
     "Token created": "Token created",
     "Token revoked": "Token revoked",
-    "Why is shop failing on casos? Show me its logs": "Why is shop failing on casos? Show me its logs"
+    "Use your local models from any app": "Use your local models from any app",
+    "Why is shop failing on casos? Show me its logs": "Why is shop failing on casos? Show me its logs",
+    "casos serves an OpenAI-compatible API for the models on your GPUs. Use an access token below as the API key.": "casos serves an OpenAI-compatible API for the models on your GPUs. Use an access token below as the API key."
   },
   "dashboard": {
     "alert healthy": "Cluster healthy",
@@ -788,6 +795,7 @@
     "Something went wrong: {{reason}}": "Something went wrong: {{reason}}",
     "Start chatting": "Start chatting",
     "Starting": "Starting",
+    "Use from other apps": "Use from other apps",
     "Your own ChatGPT on this machine in one click: Ollama and Open WebUI, set up and connected, on your GPU when you have one.": "Your own ChatGPT on this machine in one click: Ollama and Open WebUI, set up and connected, on your GPU when you have one.",
     "Your own ChatGPT, running on this machine. Chats and files never leave it.": "Your own ChatGPT, running on this machine. Chats and files never leave it."
   },

@@ -87,7 +87,7 @@ func ServeMCP(w http.ResponseWriter, r *http.Request, version string) {
 		return
 	}
 
-	caller, ok := authenticateMCP(r)
+	caller, ok := authenticateAccessToken(r)
 	if !ok {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="casos"`)
 		http.Error(w, "a casos access token is required: send it as \"Authorization: Bearer <token>\"", http.StatusUnauthorized)
@@ -140,7 +140,7 @@ func ServeMCP(w http.ResponseWriter, r *http.Request, version string) {
 	writeMCPJSON(w, responses[0])
 }
 
-func authenticateMCP(r *http.Request) (mcpCaller, bool) {
+func authenticateAccessToken(r *http.Request) (mcpCaller, bool) {
 	header := r.Header.Get("Authorization")
 	secret := ""
 	if len(header) > len("Bearer ") && strings.EqualFold(header[:len("Bearer ")], "Bearer ") {

@@ -13,6 +13,7 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {ConfirmDialog} from "@/components/shared/confirm-dialog";
 import {DataTable} from "@/components/shared/data-table";
 import {Field, FormDialog} from "@/components/shared/form-dialog";
+import {LocalModelsCard} from "@/components/shared/local-models-card";
 import {PageContainer, PageHeader} from "@/components/shared/page-header";
 import {CodeBlock, CodeText} from "@/components/shared/misc";
 
@@ -189,6 +190,8 @@ function AgentAccessPage() {
           </div>
         </CardContent>
       </Card>
+
+      <LocalModelsCard />
 
       <DataTable
         title={i18next.t("agent:Access tokens")}
