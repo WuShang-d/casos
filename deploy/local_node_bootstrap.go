@@ -34,7 +34,24 @@ const (
 	localNodeBootstrapAttempts   = 3
 	localNodeBootstrapRetryDelay = time.Minute
 	localNodeDeployPollPeriod    = 5 * time.Second
+	windowsRouteCheckPeriod      = 30 * time.Second
 )
+
+var windowsClusterRoutes = []struct {
+	network string
+	mask    string
+}{
+	{network: "10.43.0.0", mask: "255.255.0.0"},
+	{network: "10.244.0.0", mask: "255.255.0.0"},
+}
+
+// The WSL gateway the routes were last pointed at, which the watcher keeps
+// them pointed at.
+var windowsRouteGateway struct {
+	mu      sync.Mutex
+	gateway string
+	watched bool
+}
 
 // One run at a time: two would fight over wsl --shutdown and over the machine
 // record they both write.
@@ -139,20 +156,32 @@ func bootstrapLocalNode(ctx context.Context) error {
 // ensureWindowsWSLClusterRoutes lets the Windows-hosted control plane reach
 // Services and Pods behind the WSL worker. WSL's NAT address changes whenever
 // it restarts, so these active-store routes must be reconciled on every CasOS
-// startup rather than installed once.
+// startup rather than installed once — and Windows also drops them on its own
+// when the WSL adapter resets, on sleep or a network change, while WSL keeps
+// running, so a watcher puts them back.
 func ensureWindowsWSLClusterRoutes(ctx context.Context, gateway string) error {
 	ip := net.ParseIP(strings.TrimSpace(gateway))
 	if ip == nil || ip.To4() == nil || ip.IsLoopback() {
 		return fmt.Errorf("configure WSL cluster routes: invalid WSL gateway %q", gateway)
 	}
 	gateway = ip.String()
-	for _, route := range []struct {
-		network string
-		mask    string
-	}{
-		{network: "10.43.0.0", mask: "255.255.0.0"},
-		{network: "10.244.0.0", mask: "255.255.0.0"},
-	} {
+	if err := applyWindowsClusterRoutes(ctx, gateway); err != nil {
+		return err
+	}
+	logs.Info("automatic node setup: Windows routes to Service and Pod networks now use WSL gateway %s", gateway)
+
+	windowsRouteGateway.mu.Lock()
+	defer windowsRouteGateway.mu.Unlock()
+	windowsRouteGateway.gateway = gateway
+	if !windowsRouteGateway.watched {
+		windowsRouteGateway.watched = true
+		go watchWindowsClusterRoutes()
+	}
+	return nil
+}
+
+func applyWindowsClusterRoutes(ctx context.Context, gateway string) error {
+	for _, route := range windowsClusterRoutes {
 		args := []string{"CHANGE", route.network, "MASK", route.mask, gateway, "METRIC", "5"}
 		output, err := exec.CommandContext(ctx, "route.exe", args...).CombinedOutput()
 		if err != nil {
@@ -163,8 +192,58 @@ func ensureWindowsWSLClusterRoutes(ctx context.Context, gateway string) error {
 			return fmt.Errorf("configure Windows route %s/16 through WSL %s: %w: %s", route.network, gateway, err, strings.TrimSpace(string(output)))
 		}
 	}
-	logs.Info("automatic node setup: Windows routes to Service and Pod networks now use WSL gateway %s", gateway)
 	return nil
+}
+
+// watchWindowsClusterRoutes runs for the life of the process: the routes are
+// needed for as long as CasOS is.
+func watchWindowsClusterRoutes() {
+	defer func() {
+		if v := recover(); v != nil {
+			logs.Error("windows route watcher panic: %v", v)
+		}
+	}()
+	ticker := time.NewTicker(windowsRouteCheckPeriod)
+	defer ticker.Stop()
+	for range ticker.C {
+		windowsRouteGateway.mu.Lock()
+		gateway := windowsRouteGateway.gateway
+		windowsRouteGateway.mu.Unlock()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		if !windowsClusterRoutesPresent(ctx, gateway) {
+			if err := applyWindowsClusterRoutes(ctx, gateway); err != nil {
+				logs.Warning("windows routes: %v", err)
+			} else {
+				logs.Info("windows routes: Windows had dropped the routes to the Service and Pod networks, restored them through WSL gateway %s", gateway)
+			}
+		}
+		cancel()
+	}
+}
+
+// windowsClusterRoutesPresent reads the routing table, and says yes when it
+// cannot, so a transient failure does not rewrite routes that are fine.
+func windowsClusterRoutesPresent(ctx context.Context, gateway string) bool {
+	output, err := exec.CommandContext(ctx, "route.exe", "PRINT", "-4").Output()
+	if err != nil {
+		return true
+	}
+	return windowsRoutesPointAt(string(output), gateway)
+}
+
+func windowsRoutesPointAt(table, gateway string) bool {
+	found := 0
+	for _, route := range windowsClusterRoutes {
+		for _, line := range strings.Split(table, "\n") {
+			fields := strings.Fields(line)
+			if len(fields) >= 3 && fields[0] == route.network && fields[1] == route.mask && fields[2] == gateway {
+				found++
+				break
+			}
+		}
+	}
+	return found == len(windowsClusterRoutes)
 }
 
 // localNodeMachine registers whatever stands in for this machine and returns

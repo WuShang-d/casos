@@ -620,7 +620,10 @@ func (c *ApiController) GetTemplateInstances() {
 
 	result := []templateInstanceSummary{}
 	for _, configMap := range configMaps {
-		if configMap.Labels[templateInstanceLabel] == "" || configMap.Labels[appManagedByLabel] != templateManagedBy {
+		// The template's own ConfigMaps carry the instance labels too; only
+		// the record is the instance.
+		if !strings.HasPrefix(configMap.Name, templateInstancePrefix) ||
+			configMap.Labels[templateInstanceLabel] == "" || configMap.Labels[appManagedByLabel] != templateManagedBy {
 			continue
 		}
 		instance := instanceFromConfigMap(configMap)
