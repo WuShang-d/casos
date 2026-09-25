@@ -30,6 +30,8 @@ const mcpInstructions = `This server deploys and operates apps on a casos Kubern
 
 To deploy the user's project from a public Git repository, call deploy_git_repo: casos clones it, builds the image itself (from its Dockerfile, or for a Node.js, Python, Go or static site without one) and deploys it, so no registry is needed. Push your changes first, then call it again to redeploy.
 
+To run a project that ships a docker-compose.yml, call deploy_compose with the file's contents: every service runs, reaching the others by name, and the ones that publish a port get an address.
+
 Otherwise build a container image, push it to a registry the cluster can pull from (Docker Hub, GHCR, a private registry), then call deploy_app with that image. deploy_app creates the app or updates it in place, waits for the rollout, and returns the URLs the app answers on.
 
 If a rollout fails, read get_app_logs (previous=true for a crash loop) and get_app to see why, then fix and redeploy, or call rollback_app to return to the last working revision.

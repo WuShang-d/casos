@@ -31,6 +31,7 @@ Windows too. You need no YAML and no existing cluster.
 | 🛠️ **Dev environments with a GPU** | DevBoxes give you VS Code in the browser, or desktop VS Code over SSH. Start one from any Git repo in any image, and run jobs on the GPU. |
 | 📦 **An app store that's already full** | Install apps from the sealos template catalogue and Helm charts. Managed databases come with backups and a console. |
 | 🚢 **Deploy from Git** | Give it a public repository and casos builds it in the cluster, from its Dockerfile or, without one, as a Node.js, Python, Go or static project. It deploys the result with an address. There is no registry to set up, and a rebuild ships the latest commit. |
+| 🐳 **Paste a docker-compose.yml** | Most self-hosted apps ship one, and casos runs it as it is. Every service starts in the project's own namespace and reaches the others by name. Services that publish a port get an address, `${VAR}` values come from a `.env` box, and GPU reservations use your NVIDIA card. A preview shows what anything casos cannot carry over becomes before you deploy. |
 
 **Connect your AI agent with one command:**
 

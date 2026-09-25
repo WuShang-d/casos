@@ -1,7 +1,7 @@
 import React, {useMemo, useState} from "react";
 import i18next from "i18next";
 import {useTranslation} from "react-i18next";
-import {GitBranch, Hammer, Pencil, Play, Rocket, Square, Trash2} from "lucide-react";
+import {FileCode2, GitBranch, Hammer, Pencil, Play, Rocket, Square, Trash2} from "lucide-react";
 import * as ImageBackend from "@/backend/ImageBackend";
 import * as MetricsBackend from "@/backend/MetricsBackend";
 import * as NamespaceBackend from "@/backend/NamespaceBackend";
@@ -14,6 +14,7 @@ import {PageContainer, PageHeader} from "@/components/shared/page-header";
 import {SimpleSelect} from "@/components/shared/simple-select";
 import {StatusBadge} from "@/components/shared/status-badge";
 import {AppIcon} from "@/components/shared/app-icon";
+import {ComposeDeployDialog} from "@/components/shared/compose-deploy-dialog";
 import {GitBuildsSheet} from "@/components/shared/git-builds-sheet";
 import {GitDeployDialog} from "@/components/shared/git-deploy-dialog";
 import {runAction, useResource} from "@/hooks/use-resource";
@@ -59,6 +60,7 @@ function LaunchpadPage(props) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteData, setDeleteData] = useState(false);
   const [gitDeployOpen, setGitDeployOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [buildsTarget, setBuildsTarget] = useState(null);
 
   const {data: namespaces} = useResource(() => NamespaceBackend.getNamespaces(), [], {initialData: [], toastOnError: false});
@@ -268,6 +270,10 @@ function LaunchpadPage(props) {
         description={i18next.t("launchpad:Run a container image as an application — sized, reachable and kept up.")}
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setComposeOpen(true)} data-testid="launchpad-deploy-compose">
+              <FileCode2 />
+              {i18next.t("launchpad:Deploy from Compose")}
+            </Button>
             <Button variant="outline" onClick={() => setGitDeployOpen(true)} data-testid="launchpad-deploy-git">
               <GitBranch />
               {i18next.t("launchpad:Deploy from Git")}
@@ -316,6 +322,12 @@ function LaunchpadPage(props) {
         namespaces={namespaces}
         defaultNamespace={namespace === "all" ? "default" : namespace}
         onStarted={(app) => setBuildsTarget(app)}
+      />
+
+      <ComposeDeployDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        onDeployed={() => refresh({silent: true})}
       />
 
       <GitBuildsSheet
