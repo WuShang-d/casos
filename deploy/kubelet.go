@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+const nodeDeployMaxParallelImagePulls = 3
+
 func (d *NodeDeployer) startKubelet(ctx context.Context, runner NodeDeployRunner) error {
 	d.logStep(nodeDeployPhaseStarting, "Starting kubelet")
 	if _, err := runner.RunRootContext(ctx, "systemctl daemon-reload && systemctl enable kubelet && systemctl restart kubelet"); err != nil {
@@ -26,7 +28,12 @@ allowedUnsafeSysctls:
   - net.ipv4.ip_forward
   - net.ipv6.conf.all.forwarding
 resolvConf: /etc/casos-resolv.conf
-`, nodeDeployClusterDNS)
+# Serial pulls put every app behind the largest image being downloaded: one
+# multi-gigabyte AI image on a slow link held up a 20 MB nginx for an hour. The
+# cap keeps a burst of installs from splitting the bandwidth too thin.
+serializeImagePulls: false
+maxParallelImagePulls: %d
+`, nodeDeployClusterDNS, nodeDeployMaxParallelImagePulls)
 }
 
 func kubeletService(nodeName string) string {
