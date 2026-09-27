@@ -135,6 +135,8 @@ type deployDevboxRequest struct {
 	Repo      string `json:"repo"`
 	LocalPath string `json:"localPath"`
 	Branch    string `json:"branch"`
+	// Token reads a private Repo; it is kept in a Secret, never in the Deployment.
+	Token string `json:"token"`
 	// Setup runs once in the checkout, in the image, before the editor starts.
 	Setup string `json:"setup"`
 	// Password guards the editor. Empty means "generate one", handed back once
@@ -326,7 +328,13 @@ func deployDevbox(cfg *rest.Config, req deployDevboxRequest) (*deployDevboxResul
 		},
 	}
 
+	if token := strings.TrimSpace(req.Token); token != "" && env.source == devboxSourceGit {
+		if err := saveGitToken(cfg, req.Namespace, req.Name, token); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := deployAppWorkload(cfg, appReq, opts); err != nil {
+		forgetGitToken(cfg, req.Namespace, req.Name)
 		return nil, err
 	}
 

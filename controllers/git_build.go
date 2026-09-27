@@ -78,10 +78,6 @@ fail() { printf 'error=%s\n' "$1" > /dev/termination-log; echo "error: $1" >&2; 
 mkdir -p "$HOME/.config/buildkit"
 printf '%s' "$BUILDKITD_TOML" > "$HOME/.config/buildkit/buildkitd.toml"
 
-if [ -n "${GIT_TOKEN:-}" ]; then
-  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper \
-    GIT_CONFIG_VALUE_0='!f() { test "$1" = get && printf "username=oauth2\npassword=%s\n" "$GIT_TOKEN"; }; f'
-fi
 echo "==> Cloning $REPO${BRANCH:+ at $BRANCH}"
 set --
 if [ -n "$BRANCH" ]; then set -- --branch "$BRANCH"; fi
@@ -430,9 +426,6 @@ func startGitBuild(ctx context.Context, cfg *rest.Config, req gitBuildRequest) (
 
 	backoff := int32(0)
 	ttl := gitBuildTTLSeconds
-	optional := true
-	tokenEnv := secretEnv("GIT_TOKEN", gitTokenSecretName(req.Name), gitTokenKey)
-	tokenEnv.ValueFrom.SecretKeyRef.Optional = &optional
 	uid := int64(1000)
 	podLabels := map[string]string{gitBuildLabel: req.Name}
 	job := &batchv1.Job{
@@ -453,7 +446,7 @@ func startGitBuild(ctx context.Context, cfg *rest.Config, req gitBuildRequest) (
 						Name:    gitBuildContainer,
 						Image:   buildKitImage,
 						Command: []string{"/bin/sh", "-c", gitBuildScript},
-						Env: []corev1.EnvVar{
+						Env: append([]corev1.EnvVar{
 							{Name: "REPO", Value: req.Repo},
 							{Name: "BRANCH", Value: req.Branch},
 							{Name: "SUBDIR", Value: req.Path},
@@ -461,8 +454,7 @@ func startGitBuild(ctx context.Context, cfg *rest.Config, req gitBuildRequest) (
 							{Name: "BUILDKITD_TOML", Value: buildkitdConfig()},
 							{Name: "BUILDKITD_FLAGS", Value: "--oci-worker-no-process-sandbox"},
 							{Name: "GIT_TERMINAL_PROMPT", Value: "0"},
-							tokenEnv,
-						},
+						}, gitCredentialEnv(req.Name)...),
 						// Rootless BuildKit creates user namespaces, which the
 						// default seccomp and AppArmor profiles forbid.
 						SecurityContext: &corev1.SecurityContext{
@@ -516,6 +508,19 @@ func saveGitToken(cfg *rest.Config, namespace, app, token string) error {
 	existing.Data = data
 	_, err = object.UpdateSecret(cfg, existing)
 	return err
+}
+
+// Git asks the helper only after a 401, and it answers only when a token was saved.
+func gitCredentialEnv(app string) []corev1.EnvVar {
+	optional := true
+	token := secretEnv("GIT_TOKEN", gitTokenSecretName(app), gitTokenKey)
+	token.ValueFrom.SecretKeyRef.Optional = &optional
+	return []corev1.EnvVar{
+		token,
+		{Name: "GIT_CONFIG_COUNT", Value: "1"},
+		{Name: "GIT_CONFIG_KEY_0", Value: "credential.helper"},
+		{Name: "GIT_CONFIG_VALUE_0", Value: `!f() { test "$1" = get && test -n "$GIT_TOKEN" && printf "username=oauth2\npassword=%s\n" "$GIT_TOKEN"; }; f`},
+	}
 }
 
 // forgetGitToken drops the token of a first build that left no app behind,

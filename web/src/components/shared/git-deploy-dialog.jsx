@@ -82,14 +82,14 @@ export function GitDeployDialog({open, onOpenChange, namespaces, defaultNamespac
           data-testid="git-repo"
         />
       </Field>
-      <Field label={i18next.t("launchpad:Access token")} htmlFor="git-token" hint={i18next.t("launchpad:A GitHub, GitLab or Gitea token that can read a private repository. Rebuilds reuse it.")}>
+      <Field label={i18next.t("general:Access token")} htmlFor="git-token" hint={i18next.t("launchpad:A GitHub, GitLab or Gitea token that can read a private repository. Rebuilds reuse it.")}>
         <Input
           id="git-token"
           type="password"
           autoComplete="new-password"
           value={form.token}
           onChange={(e) => setField("token", e.target.value)}
-          placeholder={i18next.t("launchpad:Not needed for a public repository")}
+          placeholder={i18next.t("general:Not needed for a public repository")}
           data-testid="git-token"
         />
       </Field>

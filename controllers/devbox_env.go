@@ -127,7 +127,7 @@ func devboxRepoFolder(repo string) (string, error) {
 		return "", fmt.Errorf("the repository must be an http(s) or git:// address, such as https://github.com/owner/project.git")
 	}
 	if u.User != nil {
-		return "", fmt.Errorf("leave credentials out of the repository address: private repositories are not supported yet")
+		return "", fmt.Errorf("leave credentials out of the repository address and put a token in Access token instead")
 	}
 	name := strings.TrimSuffix(path.Base(strings.TrimRight(u.Path, "/")), ".git")
 	if !devboxFolderPattern.MatchString(name) || name == "." || name == ".." {
@@ -199,8 +199,14 @@ func applyDevboxEnvironment(env devboxEnvironment, ssh bool) func(*appsv1.Deploy
 			}
 		}
 
+		// The editor gets the token too, so pushes from its terminals, SSH and setup work.
+		var credentials []corev1.EnvVar
+		if env.source == devboxSourceGit {
+			credentials = gitCredentialEnv(depl.Name)
+			editor.Env = append(editor.Env, credentials...)
+		}
 		if env.source != "" {
-			spec.InitContainers = append(spec.InitContainers, devboxInitContainer(devboxCloneInit, devboxDefaultImage, devboxCloneScript, []corev1.EnvVar{
+			spec.InitContainers = append(spec.InitContainers, devboxInitContainer(devboxCloneInit, devboxDefaultImage, devboxCloneScript, append([]corev1.EnvVar{
 				{Name: "CASOS_SOURCE", Value: env.source},
 				{Name: "CASOS_REPO", Value: env.repo},
 				{Name: "CASOS_LOCAL_REPO", Value: env.local.root},
@@ -209,7 +215,7 @@ func applyDevboxEnvironment(env devboxEnvironment, ssh bool) func(*appsv1.Deploy
 				{Name: "CASOS_FOLDER", Value: env.folder},
 				{Name: "HOME", Value: "/tmp"},
 				{Name: "GIT_TERMINAL_PROMPT", Value: "0"},
-			}, editor.Resources, home))
+			}, credentials...), editor.Resources, home))
 		}
 
 		if env.setup != "" {

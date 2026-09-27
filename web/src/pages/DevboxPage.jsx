@@ -42,6 +42,7 @@ const emptyForm = (namespace = "default") => ({
   namespace,
   source: "empty",
   repo: "",
+  token: "",
   localPath: "",
   branch: "",
   preset: "general",
@@ -167,6 +168,7 @@ function DevboxPage() {
           namespace: form.namespace,
           source: form.source,
           repo: form.source === "git" ? form.repo.trim() : "",
+          token: form.source === "git" ? form.token.trim() : "",
           localPath: form.source === "local" ? form.localPath.trim() : "",
           branch: form.source === "empty" ? "" : form.branch.trim(),
           image: form.image.trim(),
@@ -533,7 +535,7 @@ function DevboxPage() {
               label={i18next.t("general:Repository")}
               htmlFor="devbox-repo"
               required
-              hint={i18next.t("devbox:A public Git repository, cloned into the home disk on first start.")}
+              hint={i18next.t("devbox:A Git repository, cloned into the home disk on first start.")}
             >
               <Input
                 id="devbox-repo"
@@ -552,6 +554,19 @@ function DevboxPage() {
               />
             </Field>
           </div>
+        ) : null}
+        {form.source === "git" ? (
+          <Field label={i18next.t("general:Access token")} htmlFor="devbox-token" hint={i18next.t("devbox:A GitHub, GitLab or Gitea token that can read a private repository. Git in the box uses it to push, too.")}>
+            <Input
+              id="devbox-token"
+              type="password"
+              autoComplete="new-password"
+              value={form.token}
+              onChange={(e) => setField("token", e.target.value)}
+              placeholder={i18next.t("general:Not needed for a public repository")}
+              data-testid="devbox-token-input"
+            />
+          </Field>
         ) : null}
         {form.source === "local" ? (
           <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
