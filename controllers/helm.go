@@ -397,7 +397,7 @@ func (c *ApiController) streamHelmOperation(operation, actionLabel string, runne
 	w.WriteHeader(http.StatusOK)
 
 	ctx := c.Ctx.Request.Context()
-	task, err := object.CreateHelmOperationTask(owner, operation, req.ReleaseName, req.Namespace, req.ChartName, req.Version)
+	task, err := object.CreateHelmOperationTask(owner, operation, req.ReleaseName, req.Namespace, req.ChartName, req.RepoURL, req.Version)
 	if err != nil {
 		message := fmt.Sprintf("unable to start Helm %s", actionLabel)
 		if errors.Is(err, object.ErrHelmOperationAlreadyActive) {
@@ -491,6 +491,45 @@ func (c *ApiController) GetHelmOperationTask() {
 		return
 	}
 	c.ResponseOk(task, taskLogs)
+}
+
+// GetUnfinishedHelmInstalls lists the installs Helm has no release for yet, running or failed.
+// @router /api/get-unfinished-helm-installs [get]
+func (c *ApiController) GetUnfinishedHelmInstalls() {
+	if c.RequireAdmin() {
+		return
+	}
+	namespace := c.GetString("namespace")
+	if namespace == "all" {
+		namespace = ""
+	}
+	tasks, err := object.GetUnfinishedHelmInstalls(namespace)
+	if err != nil {
+		logs.Error("get unfinished Helm installs: %v", err)
+		c.ResponseError("failed to load Helm operation tasks")
+		return
+	}
+	c.ResponseOk(tasks)
+}
+
+// DeleteHelmOperationTask removes a finished task, so a failed install leaves the apps list.
+// @router /api/delete-helm-operation-task [post]
+func (c *ApiController) DeleteHelmOperationTask() {
+	if c.RequireAdmin() {
+		return
+	}
+	var req struct {
+		Id int64 `json:"id"`
+	}
+	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil || req.Id <= 0 {
+		c.ResponseError("invalid task id")
+		return
+	}
+	if err := object.DeleteFinishedHelmOperationTask(req.Id); err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+	c.ResponseOk()
 }
 
 // GetHelmReleaseOperation returns the most recent Helm operation recorded for a

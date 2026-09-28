@@ -43,6 +43,18 @@ export function getHelmOperationTask(id) {
   }).then(r => r.json());
 }
 
+export function getUnfinishedHelmInstalls(namespace = "all") {
+  return fetch(`${Setting.ServerUrl}/api/get-unfinished-helm-installs?namespace=${encodeURIComponent(namespace)}`, {
+    credentials: "include", headers: lang(),
+  }).then(r => r.json());
+}
+
+export function deleteHelmOperationTask(id) {
+  return fetch(`${Setting.ServerUrl}/api/delete-helm-operation-task`, {
+    method: "POST", credentials: "include", headers: jsonHeaders(), body: JSON.stringify({id: Number(id)}),
+  }).then(r => r.json());
+}
+
 // Returns the most recent operation CasOS ran for a release, with its logs.
 // A release CasOS never operated on answers with a null task.
 export function getHelmReleaseOperation(name, namespace) {

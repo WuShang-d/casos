@@ -1,6 +1,6 @@
 import React from "react";
 import {useTranslation} from "react-i18next";
-import {CircleArrowUp, ExternalLink, Globe, HardDrive, Play, ScrollText, SearchX, Square, Trash2} from "lucide-react";
+import {CircleArrowUp, ExternalLink, Globe, HardDrive, Play, RotateCcw, ScrollText, SearchX, Square, Trash2} from "lucide-react";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Checkbox} from "@/components/ui/checkbox";
@@ -43,14 +43,14 @@ function toneOf(status, pending) {
   return pending ? PENDING_TONE : (STATUS_TONE[status] ?? PENDING_TONE);
 }
 
-function StatusPill({status, pending}) {
+function StatusPill({status, pending, kind}) {
   const {t} = useTranslation();
   const tone = toneOf(status, pending);
   const known = pending || STATUS_TONE[status];
   return (
     <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium", tone.pill)}>
       <span className={cn("size-1.5 rounded-full", tone.dot)} />
-      {known ? t(tone.label) : status}
+      {known ? t(kind === "install" ? (pending ? "helm:Installing" : "helm:Install failed") : tone.label) : status}
       {pending ? <AiDots size="small" className="ml-0.5" /> : null}
     </span>
   );
@@ -103,7 +103,7 @@ function AppCard({release, resources, pending, onOpenLogs, onUpgrade, onToggleRu
             {release.chartVersion ? <span className="shrink-0 font-mono text-[11px] opacity-70">{release.chartVersion}</span> : null}
           </div>
         </div>
-        <StatusPill status={release.status} pending={pending} />
+        <StatusPill status={release.status} pending={pending} kind={release.kind} />
       </div>
 
       <div className="grid gap-1.5 px-4 pb-4">
@@ -166,11 +166,21 @@ function AppCard({release, resources, pending, onOpenLogs, onUpgrade, onToggleRu
             </Button>
           </SimpleTooltip>
         ) : null}
-        <SimpleTooltip title={t("simple:Update")}>
-          <Button variant="ghost" size="icon-sm" onClick={() => onUpgrade(release)} aria-label={t("simple:Update")}>
-            <CircleArrowUp />
-          </Button>
-        </SimpleTooltip>
+        {release.kind === "install" ? (
+          release.status === "failed" ? (
+            <SimpleTooltip title={t("helm:Retry install")}>
+              <Button variant="ghost" size="icon-sm" onClick={() => onUpgrade(release)} aria-label={t("helm:Retry install")}>
+                <RotateCcw />
+              </Button>
+            </SimpleTooltip>
+          ) : null
+        ) : (
+          <SimpleTooltip title={t("simple:Update")}>
+            <Button variant="ghost" size="icon-sm" onClick={() => onUpgrade(release)} aria-label={t("simple:Update")}>
+              <CircleArrowUp />
+            </Button>
+          </SimpleTooltip>
+        )}
         <SimpleTooltip title={t("general:Logs")}>
           <Button variant="ghost" size="icon-sm" onClick={() => onOpenLogs(release)} aria-label={t("general:Logs")}>
             <ScrollText />

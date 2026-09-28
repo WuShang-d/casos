@@ -461,8 +461,10 @@
     "Helm resource not found": "兼容性检查所需的 Kubernetes 资源不存在。",
     "Helm resource not served": "当前集群不支持 Chart 所需的资源类型，可能缺少对应 CRD，或 API 版本不兼容。",
     "Install chart": "安装 chart",
+    "Install failed": "安装失败",
     "Installed Apps": "已安装的应用",
     "Installing": "安装中",
+    "Installing {{name}} in the background. My apps shows its progress.": "正在后台安装 {{name}}，可以在「我的应用」查看进度。",
     "Invalid Helm manifest": "Chart 渲染结果不是有效的 Kubernetes 资源清单。",
     "Its volumes are kept by default, and reinstalling this app will reuse them": "默认保留其数据卷，重新安装该应用时会继续使用",
     "Kubernetes API unavailable": "Kubernetes API 当前不可用，请检查控制面状态和网络连接。",
@@ -484,6 +486,7 @@
     "Repo URL": "仓库地址",
     "Repo URL pattern": "必须以 http://、https:// 或 oci:// 开头",
     "Repo name": "仓库名称",
+    "Retry install": "重新安装",
     "Retry status check": "重试状态检查",
     "Rollback": "回滚",
     "Search charts": "搜索 chart",
@@ -497,7 +500,9 @@
     "Uninstall release?": "卸载该发布？",
     "Upgrade": "升级",
     "Upgrading": "升级中",
-    "Values (YAML)": "Values (YAML)"
+    "Values (YAML)": "Values (YAML)",
+    "{{name}} failed to install": "{{name}} 安装失败",
+    "{{name}} is installed": "{{name}} 已安装"
   },
   "image": {
     "A lightweight Git service you host yourself.": "轻量级的自建 Git 服务。",

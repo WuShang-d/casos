@@ -4,6 +4,7 @@ import {dataTable, expectOkJson, tableRow} from "./e2e-helpers.js";
 
 const API_UNINSTALL_HELM_RELEASE = "/api/uninstall-helm-release";
 const API_INSTALL_HELM_CHART_STREAM = "/api/install-helm-chart-stream";
+const API_GET_HELM_RELEASE_OPERATION = "/api/get-helm-release-operation";
 const API_ADD_HELM_REPO = "/api/add-helm-repo";
 const API_GET_HELM_REPOS = "/api/get-helm-repos";
 const API_DELETE_HELM_REPO = "/api/delete-helm-repo";
@@ -115,33 +116,26 @@ function installDialog(page) {
   return page.getByRole("dialog").filter({hasText: "Install chart"});
 }
 
-function compactInstallDialogText(text) {
-  const trimmed = text.trim();
-  if (trimmed.length <= 4000) {
-    return trimmed || "No install dialog text was available.";
-  }
-  return `${trimmed.slice(0, 1800)}\n...\n${trimmed.slice(-1800)}`;
-}
-
-async function waitForInstallDone(dialog) {
-  const doneButton = dialog.getByRole("button", {name: "Done"});
-  // Alerts carry data-variant; a destructive one is the install having failed.
-  const errorAlert = dialog.locator("[data-slot=alert][data-variant=destructive]").first();
+// The dialog hands the install to the background, so completion is read from its task.
+async function waitForInstallDone(page, {releaseName, namespace}) {
+  const url = `${API_GET_HELM_RELEASE_OPERATION}?name=${encodeURIComponent(releaseName)}&namespace=${encodeURIComponent(namespace)}`;
   const deadline = Date.now() + INSTALL_DONE_TIMEOUT_MS;
+  let task = null;
 
   while (Date.now() < deadline) {
-    if (await doneButton.isVisible()) {
+    const body = await expectOkJson(await page.request.get(url));
+    task = body.data;
+    if (task?.status === "succeeded") {
       return;
     }
-    if (await errorAlert.isVisible()) {
-      const dialogText = compactInstallDialogText(await dialog.innerText());
-      throw new Error(`Helm install failed before completion:\n${dialogText}`);
+    if (task?.status === "failed") {
+      const logs = (body.data2 ?? []).map((entry) => entry.message).slice(-40).join("\n");
+      throw new Error(`Helm install failed before completion: ${task.errorMsg}\n${logs}`);
     }
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
-  const dialogText = compactInstallDialogText(await dialog.innerText());
-  throw new Error(`Timed out waiting for Helm install to complete:\n${dialogText}`);
+  throw new Error(`Timed out waiting for Helm install to complete, last task status: ${task?.status ?? "none"}`);
 }
 
 async function openChartInstallDialog(page, {repoName, chartName}) {
@@ -159,9 +153,9 @@ async function openChartInstallDialog(page, {repoName, chartName}) {
 }
 
 // installAppFromAppStore drives the App Store install flow to completion: opens the chart's
-// install dialog, overrides the release name and values, submits, and waits for the streamed
-// install log to report completion (the "Done" button). The release is recorded on
-// installedReleases so installedReleasesFixture can uninstall it afterward.
+// install dialog, overrides the release name and values, submits, and waits for the install
+// task to succeed. The release is recorded on installedReleases so installedReleasesFixture
+// can uninstall it afterward.
 async function installAppFromAppStore(page, {repoName, chartName, releaseName, namespace = "default", valuesYAML, installedReleases}) {
   const dialog = await openChartInstallDialog(page, {repoName, chartName});
 
@@ -182,9 +176,8 @@ async function installAppFromAppStore(page, {repoName, chartName, releaseName, n
   }
   expect(submittedInstall).toMatchObject({releaseName, namespace});
 
-  await waitForInstallDone(dialog);
-  await dialog.getByRole("button", {name: "Done"}).click();
-  await expect(dialog).toBeHidden();
+  await expect(dialog).toBeHidden({timeout: 30_000});
+  await waitForInstallDone(page, {releaseName, namespace});
 }
 
 // getServiceAccessUrl reads the "Access URL" column rendered for a NodePort service on the

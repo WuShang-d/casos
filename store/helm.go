@@ -46,13 +46,14 @@ import (
 )
 
 const (
-	helmOperationTimeout      = 5 * time.Minute
-	helmCompatibilityTimeout  = 2 * time.Minute
-	helmChartLoadTimeout      = 2 * time.Minute
-	helmDiagnosticsTimeout    = 15 * time.Second
-	helmDiagnosticsMaxEvents  = 20
-	helmDiagnosticsMessageLen = 240
-	helmDiagnosticsEventLen   = 360
+	helmOperationTimeout        = 5 * time.Minute
+	helmCompatibilityTimeout    = 2 * time.Minute
+	helmChartLoadTimeout        = 2 * time.Minute
+	helmOCIDirectAttemptTimeout = 20 * time.Second
+	helmDiagnosticsTimeout      = 15 * time.Second
+	helmDiagnosticsMaxEvents    = 20
+	helmDiagnosticsMessageLen   = 240
+	helmDiagnosticsEventLen     = 360
 )
 
 // ---------- Types ----------
@@ -664,11 +665,18 @@ func pullOCIChart(ctx context.Context, repoURL, version string) (*registry.PullR
 }
 
 func loadOCIChartWithMirrorFallback(ctx context.Context, repoURL, version string) (*chart.Chart, error) {
-	ch, err := loadOCIChart(ctx, repoURL, version)
+	mirrorURL := dockerHubOCIChartMirror(repoURL)
+	directCtx := ctx
+	if mirrorURL != "" {
+		// An unreachable Docker Hub would otherwise spend the whole load budget and leave the mirror none.
+		var cancel context.CancelFunc
+		directCtx, cancel = context.WithTimeout(ctx, helmOCIDirectAttemptTimeout)
+		defer cancel()
+	}
+	ch, err := loadOCIChart(directCtx, repoURL, version)
 	if err == nil {
 		return ch, nil
 	}
-	mirrorURL := dockerHubOCIChartMirror(repoURL)
 	if mirrorURL == "" {
 		return nil, err
 	}

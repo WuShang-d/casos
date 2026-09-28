@@ -85,6 +85,24 @@ function toTemplateRecord(instance) {
   };
 }
 
+// Helm lists a release only after the chart downloads; until then, or if it failed, the install task stands in.
+function toInstallRecord(task) {
+  return {
+    kind: "install",
+    name: task.releaseName,
+    namespace: task.namespace,
+    chart: task.chartName,
+    chartName: task.chartName,
+    chartVersion: task.version,
+    app_version: "",
+    status: task.status === "failed" ? "failed" : "pending-install",
+    description: task.errorMsg,
+    updated: task.createdAt,
+    icon: chartIconUrl(task.chartName),
+    task,
+  };
+}
+
 const STATUS_VARIANTS = {
   deployed: "success",
   stopped: "muted",
@@ -232,6 +250,7 @@ export default function HelmReleasePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const [upgradeTarget, setUpgradeTarget] = useState(null);
+  const [retryTarget, setRetryTarget] = useState(null);
   const [imageUpgradeTarget, setImageUpgradeTarget] = useState(null);
   const [logsPod, setLogsPod] = useState(null);
 
@@ -264,11 +283,16 @@ export default function HelmReleasePage() {
       HelmBackend.getHelmReleases(namespace),
       ImageBackend.getImageApps(namespace),
       TemplateBackend.getTemplateInstances(namespace === "all" ? "" : namespace),
+      HelmBackend.getUnfinishedHelmInstalls(namespace),
     ])
-      .then(([helmRes, imageRes, templateRes]) => {
+      .then(([helmRes, imageRes, templateRes, installRes]) => {
         const next = [];
         if (helmRes.status === "ok") {
           next.push(...(helmRes.data ?? []));
+        }
+        if (installRes.status === "ok") {
+          const listed = new Set(next.map(releaseKey));
+          next.push(...(installRes.data ?? []).map(toInstallRecord).filter((record) => !listed.has(releaseKey(record))));
         }
         if (imageRes.status === "ok") {
           next.push(...(imageRes.data ?? []).map(toAppRecord));
@@ -408,6 +432,11 @@ export default function HelmReleasePage() {
       setImageUpgradeTarget(release.image);
       return;
     }
+    if (release.kind === "install") {
+      const {chartName, repoURL, version, releaseName, namespace: taskNamespace} = release.task;
+      setRetryTarget({chartName, repoURL, version, releaseName, namespace: taskNamespace});
+      return;
+    }
     setUpgradeTarget(helmReleaseUpgradeTarget(release));
   }
 
@@ -463,6 +492,8 @@ export default function HelmReleasePage() {
       uninstalled = ImageBackend.uninstallApp({namespace: release.namespace, name: release.name, deleteData});
     } else if (release.kind === "template") {
       uninstalled = TemplateBackend.deleteTemplateInstance({namespace: release.namespace, name: release.name, deleteData});
+    } else if (release.kind === "install") {
+      uninstalled = HelmBackend.deleteHelmOperationTask(release.task.id);
     } else {
       uninstalled = HelmBackend.uninstallHelmRelease({releaseName: release.name, namespace: release.namespace, deleteData});
     }
@@ -576,14 +607,22 @@ export default function HelmReleasePage() {
               </Button>
             </SimpleTooltip>
           ) : null}
-          {release.kind === "template" ? null : (
+          {release.kind === "install" ? (
+            release.status === "failed" ? (
+              <SimpleTooltip title={t("helm:Retry install")}>
+                <Button variant="outline" size="icon-sm" onClick={() => openUpgrade(release)} aria-label="Retry install">
+                  <RotateCcw className="size-4" />
+                </Button>
+              </SimpleTooltip>
+            ) : null
+          ) : release.kind === "template" ? null : (
             <SimpleTooltip title={t("helm:Upgrade")}>
               <Button variant="outline" size="icon-sm" onClick={() => openUpgrade(release)} aria-label="Upgrade">
                 <CircleArrowUp className="size-4" />
               </Button>
             </SimpleTooltip>
           )}
-          {release.kind === "image" || release.kind === "template" ? null : (
+          {release.kind === "image" || release.kind === "template" || release.kind === "install" ? null : (
             <SimpleTooltip title={t("general:History")}>
               <Button variant="outline" size="icon-sm" onClick={() => openHistory(release)} aria-label="History">
                 <History className="size-4" />
@@ -880,6 +919,16 @@ export default function HelmReleasePage() {
         onInstalled={() => {
           setUpgradeTarget(null);
           fetchReleases();
+        }}
+      />
+
+      <HelmInstallDialog
+        open={Boolean(retryTarget)}
+        chart={retryTarget}
+        onClose={() => setRetryTarget(null)}
+        onInstalled={() => {
+          setRetryTarget(null);
+          fetchReleases({background: true});
         }}
       />
 

@@ -31,6 +31,7 @@ const (
 
 	HelmOperationPersistenceTimeout = 5 * time.Second
 	helmOperationStaleAfter         = 11 * time.Minute
+	unfinishedHelmInstallsShownFor  = 7 * 24 * time.Hour
 
 	// What an interrupted task records as its failure. A Helm operation only
 	// runs inside the CasOS process that created it, so a task still marked
@@ -45,6 +46,7 @@ func isSupportedHelmOperation(operation string) bool {
 var (
 	ErrHelmOperationAlreadyActive   = errors.New("Helm operation already active")
 	ErrHelmOperationAlreadyFinished = errors.New("Helm operation already finished")
+	ErrHelmOperationStillRunning    = errors.New("Helm operation is still running")
 )
 
 type HelmOperationTask struct {
@@ -55,6 +57,7 @@ type HelmOperationTask struct {
 	ReleaseName string    `xorm:"varchar(253) notnull index" json:"releaseName"`
 	Namespace   string    `xorm:"varchar(253) notnull index" json:"namespace"`
 	ChartName   string    `xorm:"varchar(253) notnull" json:"chartName"`
+	RepoURL     string    `xorm:"varchar(2048)" json:"repoURL"`
 	Version     string    `xorm:"varchar(100)" json:"version"`
 	Status      string    `xorm:"varchar(30) notnull index" json:"status"`
 	Phase       string    `xorm:"varchar(30) notnull" json:"phase"`
@@ -73,7 +76,7 @@ type HelmOperationLog struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func CreateHelmOperationTask(owner, operation, releaseName, namespace, chartName, version string) (*HelmOperationTask, error) {
+func CreateHelmOperationTask(owner, operation, releaseName, namespace, chartName, repoURL, version string) (*HelmOperationTask, error) {
 	owner = strings.TrimSpace(owner)
 	operation = strings.TrimSpace(operation)
 	releaseName = strings.TrimSpace(releaseName)
@@ -124,6 +127,7 @@ func CreateHelmOperationTask(owner, operation, releaseName, namespace, chartName
 			ReleaseName: releaseName,
 			Namespace:   namespace,
 			ChartName:   chartName,
+			RepoURL:     strings.TrimSpace(repoURL),
 			Version:     strings.TrimSpace(version),
 			Status:      HelmOperationStatusPending,
 			Phase:       HelmOperationPhaseQueued,
@@ -199,6 +203,45 @@ func GetLatestHelmOperationTaskForRelease(namespace, releaseName string) (*HelmO
 		return nil, err
 	}
 	return task, nil
+}
+
+// Releases whose latest operation is an install that has not succeeded, which Helm cannot list yet.
+func GetUnfinishedHelmInstalls(namespace string) ([]*HelmOperationTask, error) {
+	session := ormer.Engine.Where("created_at > ?", time.Now().UTC().Add(-unfinishedHelmInstallsShownFor))
+	if namespace = strings.TrimSpace(namespace); namespace != "" {
+		session = session.And("namespace = ?", namespace)
+	}
+	tasks := []*HelmOperationTask{}
+	if err := session.Desc("id").Find(&tasks); err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	unfinished := []*HelmOperationTask{}
+	for _, task := range tasks {
+		key := task.Namespace + "/" + task.ReleaseName
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if task.Operation == HelmOperationInstall && task.Status != HelmOperationStatusSucceeded {
+			unfinished = append(unfinished, task)
+		}
+	}
+	return unfinished, nil
+}
+
+func DeleteFinishedHelmOperationTask(id int64) error {
+	affected, err := ormer.Engine.ID(id).
+		In("status", HelmOperationStatusSucceeded, HelmOperationStatusFailed).
+		Delete(&HelmOperationTask{})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrHelmOperationStillRunning
+	}
+	_, err = ormer.Engine.Where("task_id = ?", id).Delete(&HelmOperationLog{})
+	return err
 }
 
 func GetHelmOperationTask(id int64) (*HelmOperationTask, error) {

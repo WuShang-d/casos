@@ -3,6 +3,7 @@ import {useTranslation} from "react-i18next";
 import {ChevronDown} from "lucide-react";
 import * as HelmBackend from "@/backend/HelmBackend";
 import * as NamespaceBackend from "@/backend/NamespaceBackend";
+import * as Setting from "@/Setting";
 import {
   findStoredHelmTask,
   helmTaskMatchesIdentity,
@@ -293,8 +294,8 @@ export function HelmInstallDialog({open, chart, action = "install", onClose, onI
     );
 
     setForm({
-      releaseName: isUpgrade ? chart.releaseName : savedTask?.releaseName || chart.chartName,
-      namespace: isUpgrade ? chart.namespace : savedTask?.namespace ?? "",
+      releaseName: isUpgrade ? chart.releaseName : savedTask?.releaseName || chart.releaseName || chart.chartName,
+      namespace: isUpgrade ? chart.namespace : savedTask?.namespace ?? chart.namespace ?? "",
       repoURL: chart.repoURL ?? "",
       version: chart.version ?? "",
     });
@@ -442,7 +443,10 @@ export function HelmInstallDialog({open, chart, action = "install", onClose, onI
       handleClose();
       return;
     }
-    if (submittingRef.current || valuesLoading || namespacesLoading || valuesLoadError) {
+    // An install needs none of the loaded values: sent empty, the server applies the chart's
+    // defaults and CasOS's adjustments itself. An upgrade compares against them.
+    const waitingForValues = isUpgrade && (valuesLoading || Boolean(valuesLoadError));
+    if (submittingRef.current || namespacesLoading || waitingForValues) {
       return;
     }
     if (!validate()) {
@@ -522,6 +526,12 @@ export function HelmInstallDialog({open, chart, action = "install", onClose, onI
             );
           } catch {
             setStorageWarning(t("helm:This browser cannot save the Helm operation for later recovery"));
+          }
+          // An install keeps running on the server, so the dialog steps aside; My apps shows its progress.
+          if (!isUpgrade) {
+            Setting.showMessage("info", t("helm:Installing {{name}} in the background. My apps shows its progress.", {name: releaseName}));
+            onInstalled?.();
+            handleClose();
           }
         } else {
           setLogs((previous) => [...previous, line]);
@@ -714,7 +724,7 @@ export function HelmInstallDialog({open, chart, action = "install", onClose, onI
             ) : (
               <>
                 {releaseNameField}
-                {valuesLoading ? (
+                {valuesLoading && isUpgrade ? (
                   <p className="text-muted-foreground flex items-center gap-2 text-sm">
                     <AiDots size="small" />
                     {t("simple:Getting the app ready, one moment...")}
@@ -773,8 +783,8 @@ export function HelmInstallDialog({open, chart, action = "install", onClose, onI
           </Button>
           {!done && !pollingPaused ? (
             <Button
-              loading={installing || namespacesLoading || (!advanced && valuesLoading)}
-              disabled={valuesLoading || namespacesLoading || Boolean(valuesLoadError)}
+              loading={installing || namespacesLoading || (isUpgrade && !advanced && valuesLoading)}
+              disabled={namespacesLoading || (isUpgrade && (valuesLoading || Boolean(valuesLoadError)))}
               onClick={handleSubmit}
             >
               {t(isUpgrade ? "helm:Upgrade" : "general:Install")}

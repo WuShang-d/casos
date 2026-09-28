@@ -461,8 +461,10 @@
     "Helm resource not found": "A Kubernetes resource required for the compatibility check was not found.",
     "Helm resource not served": "The target cluster does not serve a resource required by this chart. A CRD may be missing or the API version may be incompatible.",
     "Install chart": "Install chart",
+    "Install failed": "Install failed",
     "Installed Apps": "Installed Apps",
     "Installing": "Installing",
+    "Installing {{name}} in the background. My apps shows its progress.": "Installing {{name}} in the background. My apps shows its progress.",
     "Invalid Helm manifest": "The chart rendered an invalid Kubernetes manifest.",
     "Its volumes are kept by default, and reinstalling this app will reuse them": "Its volumes are kept by default, and reinstalling this app will reuse them",
     "Kubernetes API unavailable": "The Kubernetes API is unavailable. Check the control plane and network connection.",
@@ -484,6 +486,7 @@
     "Repo URL": "Repo URL",
     "Repo URL pattern": "Must start with http://, https:// or oci://",
     "Repo name": "Repo name",
+    "Retry install": "Retry install",
     "Retry status check": "Retry status check",
     "Rollback": "Rollback",
     "Search charts": "Search charts",
@@ -497,7 +500,9 @@
     "Uninstall release?": "Uninstall release?",
     "Upgrade": "Upgrade",
     "Upgrading": "Upgrading",
-    "Values (YAML)": "Values (YAML)"
+    "Values (YAML)": "Values (YAML)",
+    "{{name}} failed to install": "{{name}} failed to install",
+    "{{name}} is installed": "{{name}} is installed"
   },
   "image": {
     "A lightweight Git service you host yourself.": "A lightweight Git service you host yourself.",

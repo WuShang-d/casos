@@ -7,14 +7,14 @@ import (
 func TestFailInterruptedHelmOperationTasks(t *testing.T) {
 	withTestOrmer(t)
 
-	interrupted, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "default", "kubeview", "2.0.6")
+	interrupted, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "default", "kubeview", "", "2.0.6")
 	if err != nil {
 		t.Fatalf("CreateHelmOperationTask: %v", err)
 	}
 	if err := StartHelmOperationTaskContext(t.Context(), interrupted.Id, HelmOperationPhaseLoading); err != nil {
 		t.Fatalf("StartHelmOperationTaskContext: %v", err)
 	}
-	finished, err := CreateHelmOperationTask("admin", HelmOperationInstall, "traefik", "kube-system", "traefik", "27.0.2")
+	finished, err := CreateHelmOperationTask("admin", HelmOperationInstall, "traefik", "kube-system", "traefik", "", "27.0.2")
 	if err != nil {
 		t.Fatalf("CreateHelmOperationTask: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestFailInterruptedHelmOperationTasks(t *testing.T) {
 
 	// Clearing active_key is what frees the release name; without it the next
 	// install collides with a task nothing is running any more.
-	next, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "default", "kubeview", "2.0.6")
+	next, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "default", "kubeview", "", "2.0.6")
 	if err != nil {
 		t.Fatalf("CreateHelmOperationTask after recovery: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestGetLatestHelmOperationTaskForRelease(t *testing.T) {
 		t.Fatalf("GetLatestHelmOperationTaskForRelease returned %+v for a release with no history", missing)
 	}
 
-	first, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "default", "kubeview", "2.0.6")
+	first, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "default", "kubeview", "", "2.0.6")
 	if err != nil {
 		t.Fatalf("CreateHelmOperationTask: %v", err)
 	}
@@ -87,12 +87,12 @@ func TestGetLatestHelmOperationTaskForRelease(t *testing.T) {
 	}
 	// Another owner's task is still the answer: the question is about a release
 	// every administrator on this page can already see.
-	second, err := CreateHelmOperationTask("someone-else", HelmOperationUpgrade, "kubeview", "default", "kubeview", "2.0.7")
+	second, err := CreateHelmOperationTask("someone-else", HelmOperationUpgrade, "kubeview", "default", "kubeview", "", "2.0.7")
 	if err != nil {
 		t.Fatalf("CreateHelmOperationTask: %v", err)
 	}
 	// Same release name in another namespace must not be mistaken for it.
-	if _, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "other", "kubeview", "2.0.6"); err != nil {
+	if _, err := CreateHelmOperationTask("admin", HelmOperationInstall, "kubeview", "other", "kubeview", "", "2.0.6"); err != nil {
 		t.Fatalf("CreateHelmOperationTask: %v", err)
 	}
 

@@ -1,7 +1,8 @@
 export const helmTaskStorageSchemaVersion = 2;
 
 const helmTaskStorageMaxAgeMs = 24 * 60 * 60 * 1000;
-const helmTaskStoragePrefix = chartName => `casos.helmTask.${encodeURIComponent(chartName)}.`;
+const helmTaskKeyPrefix = "casos.helmTask.";
+const helmTaskStoragePrefix = chartName => `${helmTaskKeyPrefix}${encodeURIComponent(chartName)}.`;
 
 export const helmTaskStorageKey = (chartName, namespace, releaseName) =>
   `${helmTaskStoragePrefix(chartName)}${encodeURIComponent(namespace)}.${encodeURIComponent(releaseName)}`;
@@ -88,4 +89,26 @@ export const findStoredHelmTask = (chartName, expectedIdentity = null) => {
   invalidKeys.forEach(removeStoredHelmTask);
   matches.sort((a, b) => b.createdAt - a.createdAt);
   return matches[0] ?? null;
+};
+
+// Installs handed to the server and not yet seen to finish, whichever chart they are for.
+export const listStoredHelmInstalls = () => {
+  const installs = [];
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (!key?.startsWith(helmTaskKeyPrefix)) {continue;}
+      let chartName = "";
+      try {
+        chartName = JSON.parse(window.localStorage.getItem(key))?.chartName ?? "";
+      } catch (_) {
+        continue;
+      }
+      const stored = chartName ? readStoredHelmTask(key, chartName) : null;
+      if (stored?.operation === "install") {installs.push(stored);}
+    }
+  } catch (_) {
+    return [];
+  }
+  return installs;
 };

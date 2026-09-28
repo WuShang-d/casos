@@ -4,6 +4,7 @@ import * as Setting from "@/Setting";
 import * as AccountBackend from "@/backend/AccountBackend";
 import * as SiteBackend from "@/backend/SiteBackend";
 import {Toaster} from "@/components/ui/sonner";
+import {BackgroundInstallWatcher} from "@/components/shared/background-install-watcher";
 import {TooltipProvider} from "@/components/ui/tooltip";
 import {UiModeProvider} from "@/hooks/use-ui-mode";
 import {WorkspaceProvider} from "@/hooks/use-workspace";
@@ -138,6 +139,7 @@ class App extends Component {
         <UiModeProvider>
           <WorkspaceProvider signedIn={Boolean(this.state.account)}>
             <Toaster />
+            <BackgroundInstallWatcher enabled={Boolean(this.state.account)} />
             <Switch>
               <Route exact path="/callback" component={AuthCallback} />
               <Route
