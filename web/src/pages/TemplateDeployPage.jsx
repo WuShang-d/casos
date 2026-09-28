@@ -84,7 +84,7 @@ function TemplateDeployPage(props) {
   }, [detail, values]);
 
   function loadPreview() {
-    TemplateBackend.previewTemplate({name: templateName, namespace, domain, inputs: values})
+    TemplateBackend.previewTemplate({name: templateName, namespace, domain, inputs: values, defaults: detail.defaults})
       .then((res) => {
         if (res.status === "ok") {
           setPreview(res.data);
@@ -104,7 +104,7 @@ function TemplateDeployPage(props) {
   function deploy() {
     setSubmitting(true);
     runAction(
-      TemplateBackend.deployTemplate({name: templateName, namespace, domain, inputs: values}),
+      TemplateBackend.deployTemplate({name: templateName, namespace, domain, inputs: values, defaults: detail.defaults}),
       {
         successMessage: i18next.t("launchpad:App deployed"),
         onSuccess: (res) => history.push(resolvePath(`/templates/instances/${res.data.namespace}/${res.data.name}`)),

@@ -13,10 +13,14 @@ import {DataTable} from "@/components/shared/data-table";
 import {Loading} from "@/components/shared/loading";
 import {PageContainer, PageHeader} from "@/components/shared/page-header";
 import {AppIcon} from "@/components/shared/app-icon";
+import {CopyField} from "@/components/shared/misc";
 import {runAction} from "@/hooks/use-resource";
 import {useUiMode} from "@/hooks/use-ui-mode";
 
 const POLL_INTERVAL = 20000;
+// Every template names itself with these; they are already in the header and the address.
+const NAME_DEFAULTS = new Set(["app_name", "app_host"]);
+const SECRET_KEY = /pass|secret|token|key/i;
 
 /**
  * One app installed from the market: where to reach it, what it created, and
@@ -89,6 +93,12 @@ function TemplateInstancePage(props) {
     );
   }
 
+  const settings = [
+    ...Object.entries(instance.defaults ?? {}).filter(([key]) => !NAME_DEFAULTS.has(key)),
+    ...Object.entries(instance.inputs ?? {}),
+  ].filter(([, value]) => value !== "");
+  const starting = (instance.pending ?? []).length > 0;
+
   const objectColumns = [
     {key: "kind", title: i18next.t("template:Kind"), dataIndex: "kind", width: 180, sortable: true},
     {key: "name", title: i18next.t("general:Name"), dataIndex: "name", minWidth: 220, ellipsis: true},
@@ -130,8 +140,15 @@ function TemplateInstancePage(props) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{i18next.t("template:Address")}</CardTitle>
-            <CardDescription>{i18next.t("template:Where this app answers once its pods are up.")}</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-base">
+              {i18next.t("template:Address")}
+              {starting ? <Badge variant="warning">{i18next.t("general:Starting")}</Badge> : null}
+            </CardTitle>
+            <CardDescription>
+              {starting ?
+                i18next.t("template:Its pods are not ready yet, so the address answers 404 until they are.") :
+                i18next.t("template:Where this app answers once its pods are up.")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {(instance.apps ?? []).length > 0 ? (
@@ -174,6 +191,20 @@ function TemplateInstancePage(props) {
         </Card>
       </div>
 
+      {settings.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{i18next.t("template:Sign-in and settings")}</CardTitle>
+            <CardDescription>{i18next.t("template:The values it was deployed with, including the passwords the template generated.")}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            {settings.map(([key, value]) => (
+              <CopyField key={key} label={key} value={value} secret={SECRET_KEY.test(key)} />
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {(instance.unsupported ?? []).length > 0 ? (
         <Card className="border-warning/40">
           <CardHeader>
@@ -213,7 +244,7 @@ function TemplateInstancePage(props) {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`${i18next.t("general:Delete")} ${instance.title || instance.name}`}
-        description={i18next.t("template:Everything this app created is removed. Databases keep their data unless you say otherwise.")}
+        description={i18next.t("template:Everything this app created is removed. Its volumes and databases keep their data unless you say otherwise.")}
         confirmText={i18next.t("general:Delete")}
         onConfirm={remove}
         extra={

@@ -13,6 +13,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 
 	"github.com/casosorg/casos/object"
@@ -81,6 +84,9 @@ type templateInstanceSummary struct {
 	Objects     []appliedObject     `json:"objects,omitempty"`
 	Unsupported []unsupportedObject `json:"unsupported"`
 	Inputs      map[string]string   `json:"inputs,omitempty"`
+	Defaults    map[string]string   `json:"defaults,omitempty"`
+	// Pending names the workloads whose pods are not ready yet; the address answers 404 until then.
+	Pending []string `json:"pending,omitempty"`
 }
 
 func templateLanguage(language string) string {
@@ -226,7 +232,8 @@ func (c *ApiController) SyncTemplates() {
 
 // renderedDefaults resolves the template's own names — the ones holding
 // random() so that two installs of the same app do not collide.
-func renderedDefaults(template store.Template, env map[string]string) map[string]string {
+// given keeps what the deploy form showed, so a random name or password is the one the app gets.
+func renderedDefaults(template store.Template, env map[string]string, given map[string]string) map[string]string {
 	defaults := map[string]string{}
 	keys := make([]string, 0, len(template.Spec.Defaults))
 	for key := range template.Spec.Defaults {
@@ -234,6 +241,10 @@ func renderedDefaults(template store.Template, env map[string]string) map[string
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
+		if value := given[key]; value != "" {
+			defaults[key] = value
+			continue
+		}
 		data := templateData{Defaults: defaults, Env: env}
 		defaults[key] = substitutePlaceholders(template.Spec.Defaults[key].Value, data)
 	}
@@ -348,7 +359,7 @@ func (c *ApiController) GetTemplate() {
 	}
 	language := templateLanguage(c.GetString("language"))
 	env := c.platformEnv(namespace, c.GetString("domain"))
-	defaults := renderedDefaults(template, env)
+	defaults := renderedDefaults(template, env, nil)
 	data := templateData{Defaults: defaults, Env: env}
 
 	summary := localizedSummary(template, language)
@@ -375,12 +386,13 @@ type templateDeployRequest struct {
 	Namespace string            `json:"namespace"`
 	Domain    string            `json:"domain"`
 	Inputs    map[string]string `json:"inputs"`
+	Defaults  map[string]string `json:"defaults"`
 }
 
 // renderTemplate is the whole of the rendering half: the defaults first, then
 // the form on top of them, then the manifests.
 func renderTemplate(template store.Template, req templateDeployRequest, env map[string]string) (string, templateData, []string, []string) {
-	defaults := renderedDefaults(template, env)
+	defaults := renderedDefaults(template, env, req.Defaults)
 	data := templateData{Defaults: defaults, Inputs: map[string]string{}, Env: env}
 
 	keys := make([]string, 0, len(template.Spec.Inputs))
@@ -520,6 +532,7 @@ func (c *ApiController) DeployTemplate() {
 		Objects:     report.Applied,
 		Unsupported: report.Unsupported,
 		Inputs:      data.Inputs,
+		Defaults:    data.Defaults,
 	}
 	if err := writeTemplateInstance(cfg, instanceSummary); err != nil {
 		c.ResponseError("the app was deployed but casos could not record it: " + err.Error())
@@ -533,6 +546,7 @@ func writeTemplateInstance(cfg *rest.Config, instance templateInstanceSummary) e
 	apps, _ := json.Marshal(instance.Apps)
 	unsupported, _ := json.Marshal(instance.Unsupported)
 	inputs, _ := json.Marshal(instance.Inputs)
+	defaults, _ := json.Marshal(instance.Defaults)
 	databases, _ := json.Marshal(instance.Databases)
 
 	configMap := &corev1.ConfigMap{
@@ -555,6 +569,7 @@ func writeTemplateInstance(cfg *rest.Config, instance templateInstanceSummary) e
 			"apps":        string(apps),
 			"unsupported": string(unsupported),
 			"inputs":      string(inputs),
+			"defaults":    string(defaults),
 			"databases":   string(databases),
 		},
 	}
@@ -591,6 +606,7 @@ func instanceFromConfigMap(configMap corev1.ConfigMap) templateInstanceSummary {
 	_ = json.Unmarshal([]byte(configMap.Data["objects"]), &instance.Objects)
 	_ = json.Unmarshal([]byte(configMap.Data["unsupported"]), &instance.Unsupported)
 	_ = json.Unmarshal([]byte(configMap.Data["inputs"]), &instance.Inputs)
+	_ = json.Unmarshal([]byte(configMap.Data["defaults"]), &instance.Defaults)
 	if instance.Name == "" {
 		instance.Name = strings.TrimPrefix(configMap.Name, templateInstancePrefix)
 	}
@@ -629,6 +645,7 @@ func (c *ApiController) GetTemplateInstances() {
 		instance := instanceFromConfigMap(configMap)
 		// The object list is long and only the detail view wants it.
 		instance.Objects = nil
+		instance.Defaults = nil
 		result = append(result, instance)
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -661,7 +678,36 @@ func (c *ApiController) GetTemplateInstance() {
 		c.ResponseError(err.Error())
 		return
 	}
-	c.ResponseOk(instanceFromConfigMap(*configMap))
+	instance := instanceFromConfigMap(*configMap)
+	instance.Pending = pendingWorkloads(c.Ctx.Request.Context(), cfg, instance.Objects)
+	c.ResponseOk(instance)
+}
+
+func pendingWorkloads(ctx context.Context, cfg *rest.Config, objects []appliedObject) []string {
+	client, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil
+	}
+	pending := []string{}
+	for _, item := range objects {
+		if item.Kind != "Deployment" && item.Kind != "StatefulSet" {
+			continue
+		}
+		gvr := schema.GroupVersionResource{Group: item.Group, Version: item.Version, Resource: item.Resource}
+		workload, err := client.Resource(gvr).Namespace(item.Namespace).Get(ctx, item.Name, metav1.GetOptions{})
+		if err != nil {
+			continue
+		}
+		replicas, found, _ := unstructured.NestedInt64(workload.Object, "spec", "replicas")
+		if !found {
+			replicas = 1
+		}
+		ready, _, _ := unstructured.NestedInt64(workload.Object, "status", "readyReplicas")
+		if ready < replicas {
+			pending = append(pending, item.Name)
+		}
+	}
+	return pending
 }
 
 type templateInstanceActionRequest struct {

@@ -97,16 +97,19 @@ test -f %[1]s`, nodeDeployResolverPath)); err != nil {
 	if err := d.reconcileRegistryMirrorFiles(ctx, runner, mirrors); err != nil {
 		return nil, err
 	}
-	if _, err := runner.RunRootContext(ctx, "systemctl enable --now containerd && systemctl restart containerd"); err != nil {
-		return nil, fmt.Errorf("start containerd: %w", err)
-	}
-
-	d.logStep(nodeDeployPhaseInstalling, "Ensuring upstream kubelet, kube-proxy, and CNI plugins")
 	// A network that needs the image mirrors also crawls on dl.k8s.io and GitHub release downloads.
 	source := "https://"
 	if mirrors.ghcr {
 		source += FileMirror + "/"
 	}
+	if err := d.replaceBrokenContainerd(ctx, runner, source, arch); err != nil {
+		return nil, err
+	}
+	if _, err := runner.RunRootContext(ctx, "systemctl enable --now containerd && systemctl restart containerd"); err != nil {
+		return nil, fmt.Errorf("start containerd: %w", err)
+	}
+
+	d.logStep(nodeDeployPhaseInstalling, "Ensuring upstream kubelet, kube-proxy, and CNI plugins")
 	installCmd := fmt.Sprintf(`set -e
 download() {
   url="$3"
@@ -137,6 +140,33 @@ fi`, version, source, version, arch, source, version, arch, source, cniVersion, 
 		return nil, fmt.Errorf("install node binaries: %w", err)
 	}
 	return gpu, nil
+}
+
+// containerd 2.2.0 and 2.2.1, the current Ubuntu package, cannot start an image whose
+// /etc/passwd is an absolute symlink, as in every jlesage desktop app (containerd#12683).
+func (d *NodeDeployer) replaceBrokenContainerd(ctx context.Context, runner NodeDeployRunner, source, arch string) error {
+	output, err := runner.RunRootContext(ctx, "containerd --version")
+	if err != nil {
+		return fmt.Errorf("read containerd version: %w", err)
+	}
+	if !brokenContainerdVersion.MatchString(output) {
+		return nil
+	}
+	d.logStep(nodeDeployPhaseInstalling, fmt.Sprintf("Replacing containerd %s with %s", strings.TrimSpace(brokenContainerdVersion.FindString(output)), fixedContainerdVersion))
+	archive := fmt.Sprintf("containerd-%s-linux-%s.tar.gz", strings.TrimPrefix(fixedContainerdVersion, "v"), arch)
+	url := fmt.Sprintf("%sgithub.com/containerd/containerd/releases/download/%s/%s", source, fixedContainerdVersion, archive)
+	if _, err := runner.RunRootContext(ctx, fmt.Sprintf(`set -e
+dir=$(mktemp -d)
+cd "$dir"
+curl -fsSL --connect-timeout 20 --max-time 600 --retry 2 -o %[1]s %[2]s
+curl -fsSL --connect-timeout 20 --max-time 60 --retry 2 -o %[1]s.sha256sum %[2]s.sha256sum
+sha256sum -c %[1]s.sha256sum
+tar -xzf %[1]s bin/containerd bin/containerd-shim-runc-v2
+install -m 0755 bin/containerd bin/containerd-shim-runc-v2 "$(dirname "$(command -v containerd)")"
+rm -rf "$dir"`, archive, url)); err != nil {
+		return fmt.Errorf("replace containerd: %w", err)
+	}
+	return nil
 }
 
 func (d *NodeDeployer) resolveRegistryMirrors(ctx context.Context, runner registryMirrorFileRunner) (registryMirrorSelection, error) {

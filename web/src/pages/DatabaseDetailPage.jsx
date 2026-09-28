@@ -4,11 +4,8 @@ import {useTranslation} from "react-i18next";
 import {
   ArrowLeft,
   Boxes,
-  Copy,
   Database,
   Download,
-  Eye,
-  EyeOff,
   HardDrive,
   Pencil,
   Play,
@@ -21,13 +18,13 @@ import {
   Trash2,
 } from "lucide-react";
 import * as DatabaseBackend from "@/backend/DatabaseBackend";
-import * as Setting from "@/Setting";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import {Checkbox} from "@/components/ui/checkbox";
 import {MessageAlert} from "@/components/ui/alert";
 import {ConfirmDialog} from "@/components/shared/confirm-dialog";
+import {CopyField} from "@/components/shared/misc";
 import {DataTable} from "@/components/shared/data-table";
 import {Loading} from "@/components/shared/loading";
 import {PageContainer, PageHeader} from "@/components/shared/page-header";
@@ -43,44 +40,6 @@ import {runAction} from "@/hooks/use-resource";
 import {useUiMode} from "@/hooks/use-ui-mode";
 
 const POLL_INTERVAL = 15000;
-
-function CopyField({label, value, secret}) {
-  const [revealed, setRevealed] = useState(false);
-  if (!value) {
-    return null;
-  }
-  const shown = secret && !revealed ? "•".repeat(Math.min(String(value).length, 24)) : value;
-
-  return (
-    <div className="grid gap-1">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <div className="flex items-center gap-1.5">
-        <code className="bg-muted/60 min-w-0 flex-1 truncate rounded-md px-2 py-1.5 font-mono text-xs">{shown}</code>
-        {secret ? (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label={revealed ? i18next.t("database:Hide") : i18next.t("database:Reveal")}
-            onClick={() => setRevealed((open) => !open)}
-          >
-            {revealed ? <EyeOff /> : <Eye />}
-          </Button>
-        ) : null}
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={i18next.t("launchpad:Copy")}
-          onClick={() => {
-            navigator.clipboard?.writeText(String(value));
-            Setting.showMessage("success", i18next.t("launchpad:Copied"));
-          }}
-        >
-          <Copy />
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 /**
  * One database: how to connect to it, what it is doing, and the backups it

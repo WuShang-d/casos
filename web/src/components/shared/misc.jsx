@@ -1,5 +1,7 @@
 import * as React from "react";
-import {Check, Copy, HelpCircle} from "lucide-react";
+import i18next from "i18next";
+import {Check, Copy, Eye, EyeOff, HelpCircle} from "lucide-react";
+import * as Setting from "@/Setting";
 import {cn} from "@/lib/utils";
 import {Button} from "@/components/ui/button";
 import {SimpleTooltip} from "@/components/ui/tooltip";
@@ -115,6 +117,44 @@ export function Space({children, className, size = "default", direction = "horiz
       )}
     >
       {children}
+    </div>
+  );
+}
+
+export function CopyField({label, value, secret}) {
+  const [revealed, setRevealed] = React.useState(false);
+  if (!value) {
+    return null;
+  }
+  const shown = secret && !revealed ? "•".repeat(Math.min(String(value).length, 24)) : value;
+
+  return (
+    <div className="grid gap-1">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <code className="bg-muted/60 min-w-0 flex-1 truncate rounded-md px-2 py-1.5 font-mono text-xs">{shown}</code>
+        {secret ? (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={revealed ? i18next.t("database:Hide") : i18next.t("database:Reveal")}
+            onClick={() => setRevealed((open) => !open)}
+          >
+            {revealed ? <EyeOff /> : <Eye />}
+          </Button>
+        ) : null}
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label={i18next.t("launchpad:Copy")}
+          onClick={() => {
+            navigator.clipboard?.writeText(String(value));
+            Setting.showMessage("success", i18next.t("launchpad:Copied"));
+          }}
+        >
+          <Copy />
+        </Button>
+      </div>
     </div>
   );
 }

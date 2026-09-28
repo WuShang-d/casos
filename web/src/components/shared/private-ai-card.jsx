@@ -43,7 +43,7 @@ function describeStatus(status, model, t) {
     return {stage: t("privateAi:Downloading the app — a few GB, only the first time"), percent: null};
   }
   if (services.some((pod) => !pod.ready)) {
-    return {stage: t("privateAi:Starting"), percent: null};
+    return {stage: t("general:Starting"), percent: null};
   }
   const job = status.pods.find((pod) => pod.job && !pod.ready);
   if (job) {
@@ -54,7 +54,7 @@ function describeStatus(status, model, t) {
       percent: progressOf(job.progress),
     };
   }
-  return {stage: t("privateAi:Starting"), percent: null};
+  return {stage: t("general:Starting"), percent: null};
 }
 
 function GpuBadge({detail}) {

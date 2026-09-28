@@ -11,6 +11,7 @@ import (
 
 const (
 	defaultNodeDeployCNIVersion = "v1.5.1"
+	fixedContainerdVersion      = "v2.2.9"
 	nodeDeployClusterCIDR       = "10.244.0.0/16"
 	nodeDeployClusterDNS        = "10.43.0.10"
 	nodeDeployPhasePreflight    = "preflight"
@@ -140,6 +141,8 @@ func ConfigFromServerConfig(cfg server.Config) Config {
 		},
 	}
 }
+
+var brokenContainerdVersion = regexp.MustCompile(`\sv?2\.2\.[01](\s|$)`)
 
 var nodeDeployNameRegexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
 
