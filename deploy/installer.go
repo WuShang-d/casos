@@ -102,6 +102,11 @@ test -f %[1]s`, nodeDeployResolverPath)); err != nil {
 	}
 
 	d.logStep(nodeDeployPhaseInstalling, "Ensuring upstream kubelet, kube-proxy, and CNI plugins")
+	// A network that needs the image mirrors also crawls on dl.k8s.io and GitHub release downloads.
+	source := "https://"
+	if mirrors.ghcr {
+		source += FileMirror + "/"
+	}
 	installCmd := fmt.Sprintf(`set -e
 download() {
   url="$3"
@@ -116,18 +121,18 @@ needs_kube_binary() {
   return 0
 }
 if needs_kube_binary /usr/local/bin/kubelet; then
-  download -o /tmp/kubelet https://dl.k8s.io/release/%s/bin/linux/%s/kubelet
+  download -o /tmp/kubelet %sdl.k8s.io/release/%s/bin/linux/%s/kubelet
   install -o root -g root -m 0755 /tmp/kubelet /usr/local/bin/kubelet
 fi
 if needs_kube_binary /usr/local/bin/kube-proxy; then
-  download -o /tmp/kube-proxy https://dl.k8s.io/release/%s/bin/linux/%s/kube-proxy
+  download -o /tmp/kube-proxy %sdl.k8s.io/release/%s/bin/linux/%s/kube-proxy
   install -o root -g root -m 0755 /tmp/kube-proxy /usr/local/bin/kube-proxy
 fi
 mkdir -p /opt/cni/bin /etc/cni/net.d
 if [ ! -x /opt/cni/bin/bridge ] || [ ! -x /opt/cni/bin/loopback ] || [ ! -x /opt/cni/bin/portmap ]; then
-  download -o /tmp/cni-plugins.tgz https://github.com/containernetworking/plugins/releases/download/%s/cni-plugins-linux-%s-%s.tgz
+  download -o /tmp/cni-plugins.tgz %sgithub.com/containernetworking/plugins/releases/download/%s/cni-plugins-linux-%s-%s.tgz
   tar -xzf /tmp/cni-plugins.tgz -C /opt/cni/bin
-fi`, version, version, arch, version, arch, cniVersion, arch, cniVersion)
+fi`, version, source, version, arch, source, version, arch, source, cniVersion, arch, cniVersion)
 	if _, err := runner.RunRootContext(ctx, installCmd); err != nil {
 		return nil, fmt.Errorf("install node binaries: %w", err)
 	}

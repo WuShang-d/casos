@@ -10,6 +10,8 @@ const (
 	DockerHubMirror   = "docker.1ms.run"
 	K8sRegistryMirror = "k8s.m.daocloud.io"
 	GhcrMirror        = "ghcr.nju.edu.cn"
+	// Serves dl.k8s.io and github.com downloads under /dl.k8s.io/... and /github.com/...
+	FileMirror = "files.m.daocloud.io"
 )
 
 // GenerateContainerdConfig returns the content for /etc/containerd/config.toml.
