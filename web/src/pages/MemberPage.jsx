@@ -56,7 +56,7 @@ function MemberPage({initialStatus, onSignout}) {
         </CardHeader>
         <CardContent className="grid gap-3 text-sm">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-muted-foreground">{i18next.t("machine:Connection")}</span>
+            <span className="text-muted-foreground">{i18next.t("machine:Connection status")}</span>
             {status?.connected ? (
               <Badge variant="success">{i18next.t("machine:Connected")}</Badge>
             ) : (

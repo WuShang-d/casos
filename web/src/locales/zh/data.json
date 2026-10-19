@@ -682,7 +682,7 @@
     "Cloud standalone - Description": "把多台电脑上的 CasOS 连成一朵云，即使相隔公网：让这台电脑成为其他电脑加入的中心，或加入一朵已有的云。",
     "Computers it can add": "可加入的电脑数",
     "Connected": "已连接",
-    "Connection": "连接状态",
+    "Connection status": "连接状态",
     "Continue in background": "后台继续",
     "Create invite": "生成邀请",
     "Default WSL distribution": "默认",
