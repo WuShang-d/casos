@@ -34,7 +34,7 @@ To run a project that ships a docker-compose.yml, call deploy_compose with the f
 
 Otherwise build a container image, push it to a registry the cluster can pull from (Docker Hub, GHCR, a private registry), then call deploy_app with that image. deploy_app creates the app or updates it in place, waits for the rollout, and returns the URLs the app answers on.
 
-If a rollout fails, read get_app_logs (previous=true for a crash loop) and get_app to see why, then fix and redeploy, or call rollback_app to return to the last working revision.
+If a rollout fails, read get_app_logs (previous=true for a crash loop) and get_app to see why, then fix and redeploy, or call rollback_app to return to the last working revision. When the trouble may be the cluster itself, call get_cluster_health for the overall state and list_cluster_issues for the problems casos has found across it.
 
 To run code instead of deploying it, call create_sandbox for an isolated Linux workspace, optionally with a Git repository cloned and a setup script run. Work in it with exec_in_sandbox, read_sandbox_file and write_sandbox_file, and hand long or GPU work to start_sandbox_job. A sandbox is deleted when its lease runs out; call extend_sandbox to keep working, and delete_sandbox when done. Each sandbox is also a DevBox the user can open in VS Code, so give them its url and password when they want to follow along.`
 
