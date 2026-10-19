@@ -32,6 +32,18 @@ export function serviceAccessUrls(record, nodeIP) {
   return urls;
 }
 
+// *.localhost / sslip.io hosts answer on casos's app-gateway port, not 80, so
+// the bare host is unreachable; the browser reached casos on that same port.
+function appGatewayPortSuffix(host) {
+  const h = String(host).toLowerCase();
+  const isGateway = h === "localhost" || h.endsWith(".localhost") || /\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}\.sslip\.io$/.test(h);
+  if (!isGateway) {
+    return "";
+  }
+  const port = typeof window !== "undefined" ? window.location.port : "";
+  return port && port !== "80" ? `:${port}` : "";
+}
+
 // An Ingress rule already names the host the app answers on; TLS on the
 // Ingress is what decides the scheme.
 export function ingressAccessUrls(record) {
@@ -42,7 +54,7 @@ export function ingressAccessUrls(record) {
       return;
     }
     const path = rule.path && rule.path !== "/" ? rule.path : "";
-    urls.push(`${scheme}://${rule.host}${path}`);
+    urls.push(`${scheme}://${rule.host}${appGatewayPortSuffix(rule.host)}${path}`);
   });
   return urls;
 }
