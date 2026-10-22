@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Simple from './views/Simple.jsx'
 import Pro from './views/Pro.jsx'
 import { HOST_HISTORY_KEY, readHosts, rememberHost } from './lib/hostHistory.js'
@@ -10,6 +10,15 @@ export default function App() {
   useEffect(() => { try { localStorage.setItem(HOST_HISTORY_KEY, JSON.stringify(hostHistory)) } catch {} }, [hostHistory])
   const onRememberHost = (host) => setHostHistory((current) => rememberHost(current, host))
   const onRemoveHost = (host) => setHostHistory((current) => current.filter((value) => value !== host))
+  const activeProbe = useRef(null)
+  const [homeVersion, setHomeVersion] = useState(0)
+  function goHome() {
+    activeProbe.current?.abort()
+    activeProbe.current = null
+    setProbing(false); setFacts(null); setErr(''); setMode('simple')
+    setHomeVersion((version) => version + 1)
+    window.scrollTo({ top: 0 })
+  }
   const [mode, setMode] = useState('simple')
   const [results, setResults] = useState({})
   const [jobs, setJobs] = useState(() => { try { return JSON.parse(sessionStorage.getItem('segscope-jobs') || '{}') } catch { return {} } })
@@ -33,6 +42,7 @@ export default function App() {
     onRememberHost(conn.host)
     setProbing(true)
     const controller = new AbortController()
+    activeProbe.current = controller
     const timer = setTimeout(() => controller.abort(), 45000)
     try {
       const response = await fetch('/api/probe', {
@@ -45,36 +55,39 @@ export default function App() {
           privateKey: conn.auth === 'key' ? conn.secret : '',
         }),
       })
+      if (activeProbe.current !== controller) return
       if (!response.headers.get('content-type')?.includes('application/json')) {
         setErr('连接服务暂时不可用，请稍后刷新页面重试。你的电脑还没有开始检查。')
         return
       }
       const data = await response.json()
+      if (activeProbe.current !== controller) return
       if (data.error) setErr(data.error)
       else if (!response.ok || !data.facts?.KERNEL || !data.facts?.ARCH) setErr('没有收到完整的检查结果，请稍后重试。')
       else setFacts(data.facts)
     } catch (e2) {
+      if (activeProbe.current !== controller) return
       setErr(e2.name === 'AbortError' ? '等待连接的时间过长，请检查电脑是否在线后重试。' : '无法联系检查服务，请确认网络连接正常后重试。')
     } finally {
       clearTimeout(timer)
-      setProbing(false)
+      if (activeProbe.current === controller) { activeProbe.current = null; setProbing(false) }
     }
   }
 
-  const shared = { hostHistory, onRememberHost, onRemoveHost, jobs, setJobs, selectedExperiment, setSelectedExperiment, proTab, setProTab, results, setResults, conn, setConn, facts, probing, err, probe }
+  const shared = { goHome, hostHistory, onRememberHost, onRemoveHost, jobs, setJobs, selectedExperiment, setSelectedExperiment, proTab, setProTab, results, setResults, conn, setConn, facts, probing, err, probe }
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="header-inner">
-          <div className="brand"><span>使用痕迹分析</span><span className="brand-divider" /><span className="brand-product">SegScope</span></div>
+          <button type="button" className="brand" onClick={goHome} aria-label="使用痕迹分析，返回首页"><span>使用痕迹分析</span><span className="brand-divider" /><span className="brand-product">SegScope</span></button>
           <nav className="mode-switch" aria-label="页面模式">{[['simple', '简洁版'], ['pro', '专业版']].map(([value, label]) => <button key={value} onClick={() => setMode(value)} className={mode === value ? 'active' : ''} aria-current={mode === value ? 'page' : undefined}>{label}</button>)}</nav>
           <span className="header-caption">电脑信息检查</span>
         </div>
       </header>
 
       <main className="flex-1">
-        {mode === 'simple' ? <Simple {...shared} toPro={(tab = 'probe') => { setProTab(tab); setMode('pro') }} /> : <Pro {...shared} />}
+        {mode === 'simple' ? <Simple key={homeVersion} {...shared} toPro={(tab = 'probe') => { setProTab(tab); setMode('pro') }} /> : <Pro {...shared} />}
       </main>
 
       <footer className="app-footer"><span>SegScope · 使用痕迹分析</span><span>仅检查你有权使用的电脑 · 登录信息不保存</span></footer>

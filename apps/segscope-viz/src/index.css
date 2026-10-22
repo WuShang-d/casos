@@ -197,3 +197,9 @@ input[type=checkbox], input[type=radio] { accent-color: #ff6a00; }
 .host-history-remove { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 4px; color: #64748b; font-size: 22px; line-height: 1; }
 .host-history-remove:hover { background: #fee2e2; color: #b91c1c; }
 .host-history button:focus-visible { outline: 2px solid #f97316; outline-offset: -2px; }
+
+.brand { cursor: pointer; text-align: left; }
+.page-breadcrumb button:hover, .brand:hover { color: #ea580c; }
+.page-breadcrumb button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.page-breadcrumb button:focus-visible, .brand:focus-visible { outline: 2px solid #f97316; outline-offset: 4px; border-radius: 2px; }
+.page-breadcrumb .breadcrumb-current { color: #86909c; }

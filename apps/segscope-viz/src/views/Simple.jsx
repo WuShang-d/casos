@@ -6,14 +6,15 @@ import { projects as checks, statusText } from '../lib/projects.js'
 import ConnForm from '../components/ConnForm.jsx'
 import { computeReadiness } from '../lib/score.js'
 
-export default function Simple({ hostHistory, onRememberHost, onRemoveHost, jobs, setJobs, conn, setConn, facts, probing, err, probe, toPro, results, setResults, selectedExperiment, setSelectedExperiment }) {
+export default function Simple({ goHome, hostHistory, onRememberHost, onRemoveHost, jobs, setJobs, conn, setConn, facts, probing, err, probe, toPro, results, setResults, selectedExperiment, setSelectedExperiment }) {
   const [showProject, setShowProject] = useState(false)
   function openProject(id) { setSelectedExperiment(id); setShowProject(true); window.scrollTo({ top: 0 }) }
   const readiness = facts ? computeReadiness(facts) : null
-  if (showProject) return <div className="simple-page"><ProjectWorkspace jobs={jobs} setJobs={setJobs} conn={conn} experiment={selectedExperiment} setExperiment={setSelectedExperiment} facts={facts} results={results} setResults={setResults} simple onBack={() => setShowProject(false)} /></div>
+  const breadcrumb = <nav className="page-breadcrumb" aria-label="当前位置"><button type="button" onClick={goHome}>首页</button><span aria-hidden="true">/</span><span className="breadcrumb-current" aria-current="page">{showProject ? checks.find((check) => check.id === selectedExperiment)?.short : '电脑信息检查'}</span></nav>
+  if (showProject) return <div className="simple-page">{breadcrumb}<ProjectWorkspace jobs={jobs} setJobs={setJobs} conn={conn} experiment={selectedExperiment} setExperiment={setSelectedExperiment} facts={facts} results={results} setResults={setResults} simple onBack={() => setShowProject(false)} /></div>
   return (
     <div className="simple-page">
-      <div className="page-breadcrumb">首页 <span>/</span> 电脑信息检查</div>
+      {breadcrumb}
       {!facts ? (
         <>
           <div className="simple-hero">
