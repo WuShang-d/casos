@@ -1,0 +1,8 @@
+SegScope-based usage-trace analysis application for CasOS.
+
+This application uses selected sources from https://github.com/zhangxin00/segscope
+at revision 32d6885b0bc8c0ab2f79c207cdfba056e8ae055d, licensed under MIT.
+See third_party/segscope/LICENSE and SOURCE.json for attribution and source hashes.
+The UI, SSH task controller, parsers and bounded runners are additions for this application.
+The bounded experiments use different parameters from the upstream research experiments.
+Screenshots show this application's interface and a real short-run result; they are not paper results.

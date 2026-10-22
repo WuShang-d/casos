@@ -1,0 +1,29 @@
+image:
+  repository: casos.local/segscope-viz
+  tag: "0.3.0"
+  pullPolicy: IfNotPresent
+
+replicas: 1
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  className: traefik
+  host: ""
+
+automation:
+  enabled: true
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

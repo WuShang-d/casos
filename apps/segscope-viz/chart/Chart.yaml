@@ -1,0 +1,11 @@
+apiVersion: v2
+name: segscope-viz
+description: SegScope automated lab checks and result analysis
+type: application
+version: 0.3.0
+appVersion: "0.3.0"
+keywords:
+  - side-channel
+  - security
+  - visualization
+  - segscope

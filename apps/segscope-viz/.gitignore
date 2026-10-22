@@ -1,0 +1,8 @@
+node_modules/
+build/
+dist/
+release/
+run/
+/segscope-viz
+__pycache__/
+*.pyc

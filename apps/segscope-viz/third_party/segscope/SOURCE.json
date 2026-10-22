@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/zhangxin00/segscope",
+  "revision": "32d6885b0bc8c0ab2f79c207cdfba056e8ae055d",
+  "license": "MIT",
+  "files": {
+    "E1-Fingerprinting_Websites/tick.c": "df9017398d1cba34b7f291bc3e59fc14c0ef8106a153b3e5a78f785ab8a859a3",
+    "E3-Breaking_KASLR/main.c": "ea9e83dd0b0e3d73e382736f8d3ac107ac1ffe978bc473d7bf95d831d85820fd",
+    "E4-Interrupt_Detection/CMakeLists.txt": "50184ca34e9060b84e617cf8012f23e7008858c66d5cc149284dc5c07c7bf098",
+    "E4-Interrupt_Detection/include/AutoInstrument/AutoInstrumentPass.h": "a094eb1fbf2869334e12e404776952cf9b284524f9bd63bd7d080303f888c08c",
+    "E4-Interrupt_Detection/include/AutoInstrument/IntMonBranchPass.h": "ed5599883a0d8c3cad352e34c8c437ff13e97550c4dee7fc97e30f781a69e5e7",
+    "E4-Interrupt_Detection/runtime/intmon_runtime.c": "1160cc98e732e32457f49f308872aae3ed806f927440e5e89a2cb096c0d7846f",
+    "E4-Interrupt_Detection/runtime/intr_runtime.c": "4f1506f54c4061fbfd445a37d9745d97cb2c9684da18dc858f2558d0bd829e62",
+    "E4-Interrupt_Detection/runtime/intr_runtime.h": "2239d062fa96b1c4c95f8a5e6567be4f755eca8ea477ab290cb47f7ad9438dfc",
+    "E4-Interrupt_Detection/src/AutoInstrumentPass.cpp": "7db833bb3806b9212cc4e2ebb20c9149bba14dda372487e7d69b68346aaa9f00",
+    "E4-Interrupt_Detection/src/IntMonBranchPass.cpp": "7b3975d755b62ee28f85245b31ea0aac397bd66a8cd87d0a18fe01486ceb6a32",
+    "LICENSE": "f0063c59aa7039d1c45c4f7833273a034c14388e2b9b0a59103dee3fff5fdd41"
+  }
+}
