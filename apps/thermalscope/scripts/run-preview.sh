@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+export THERMALSCOPE_ADDR="${THERMALSCOPE_ADDR:-127.0.0.1:25176}"
+export THERMALSCOPE_STATIC_DIR="${THERMALSCOPE_STATIC_DIR:-$PWD/build}"
+export THERMALSCOPE_DATA_DIR="${THERMALSCOPE_DATA_DIR:-$PWD/run/jobs}"
+export THERMALSCOPE_ENABLE_JOBS="${THERMALSCOPE_ENABLE_JOBS:-true}"
+exec ./thermalscope

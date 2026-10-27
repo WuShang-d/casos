@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/zhangxin00/ThermalScope",
+  "commit": "43ff9efaa6ac77fe3fe2d1dfcc1efd15d162db53",
+  "licenseFileFound": false,
+  "files": {
+    "README.md": "078037c65cee81575f4f02bae963e882fb65b941b40f92d2d22e70e9790e6abe",
+    "E1-Covert_Channel/run.sh": "35f48a9d837034d9d3bdc4e9096b7e1b59fc112f393180960ebb918952e64ad5",
+    "E1-Covert_Channel/error-rate.c": "4f667ef767a6347eea8da449e725f6d03c302da9be671905a7c9a81438db81bd",
+    "E2_Fingerprinting_DNN_Models/record_data-save-memory.py": "9d979e6ce4153d8410c790d422b0810d5227f0f21ce5f47b5eb58bcd415bdd4f",
+    "E3_Breaking_KASLR/break-KASLR.c": "26345d911510d12a3aa7b41fd9ccdf38b52b0ccfd20336fd27332ffe37b60689"
+  }
+}

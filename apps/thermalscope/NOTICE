@@ -1,0 +1,16 @@
+ThermalScope thermal-signal teaching experiment application
+Application code is licensed under Apache-2.0.
+Common UI and SSH job infrastructure are adapted from CasOS SegScope
+(https://github.com/casosorg/segscope), licensed under Apache-2.0.
+
+Research reference:
+Xin Zhang et al., "ThermalScope: A Practical Interrupt Side Channel Attack Based On Thermal Event Interrupts", DAC 2024.
+Research artifact: https://github.com/zhangxin00/ThermalScope
+Reviewed revision: 43ff9efaa6ac77fe3fe2d1dfcc1efd15d162db53
+No license file was present at the reviewed revision. Upstream source,
+models and images are not distributed with this application. The passive sampler and bounded active thermal sender/receiver
+are independently implemented.
+This application is not an official release or a claim of paper reproduction.
+
+The Go dependencies golang.org/x/crypto and golang.org/x/sys use
+BSD-style licenses included under third_party/licenses/.

@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: web
+          image: {{ required "Set image to your published container reference" .Values.image | quote }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          env:
+            - name: THERMALSCOPE_ENABLE_JOBS
+              value: "true"
+            - name: THERMALSCOPE_ENABLE_CHANNEL
+              value: {{ .Values.channel.enabled | quote }}
+            - name: THERMALSCOPE_CHANNEL_BLOCKED_HOSTKEYS
+              value: {{ .Values.channel.blockedHostKeys | quote }}
+            - name: THERMALSCOPE_ADDR
+              value: ":8080"
+            - name: THERMALSCOPE_DATA_DIR
+              value: /data/jobs
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+      volumes:
+        - name: data
+{{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data
+{{- else }}
+          emptyDir:
+            sizeLimit: 1Gi
+{{- end }}

@@ -1,0 +1,99 @@
+name: ThermalScope image
+
+on:
+  pull_request:
+    paths:
+      - apps/thermalscope/**
+      - store/builtin/thermalscope.yaml
+      - .github/workflows/thermalscope-image.yml
+  push:
+    branches: [master]
+    paths:
+      - apps/thermalscope/**
+      - store/builtin/thermalscope.yaml
+      - .github/workflows/thermalscope-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thermalscope-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/thermalscope
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: apps/thermalscope/yarn.lock
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache-dependency-path: apps/thermalscope/go.sum
+      - name: Verify application without thermal workloads
+        run: |
+          yarn install --frozen-lockfile --non-interactive
+          node scripts/check-imports.mjs
+          node scripts/check-channel-imports.mjs
+          python3 scripts/check-channel.py
+          python3 scripts/build-runner.py
+          go build -o "$RUNNER_TEMP/thermalscope-server" ./server
+          go vet ./server
+          go test ./...
+          yarn build
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/thermalscope" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/thermalscope
+          file: apps/thermalscope/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: |
+            ${{ steps.image.outputs.name }}:0.1.0
+            ${{ steps.image.outputs.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify container startup
+        env:
+          THERMALSCOPE_IMAGE: ${{ steps.image.outputs.name }}:0.1.0
+        run: |
+          trap 'docker rm -fv thermalscope-smoke >/dev/null 2>&1 || true' EXIT
+          docker run -d --name thermalscope-smoke --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m --cpus 0.5 -p 127.0.0.1:18080:8080 "$THERMALSCOPE_IMAGE"
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/api/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/api/health | python3 -c 'import json,sys; v=json.load(sys.stdin); assert v["status"] == "ready" and v["channelEnabled"] is False'
+          curl -fsS http://127.0.0.1:18080/ | grep -q 'id="root"'
+      - name: Log in to GHCR for default-branch publication
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish validated image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        env:
+          THERMALSCOPE_IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          docker push "$THERMALSCOPE_IMAGE:0.1.0"
+          docker push "$THERMALSCOPE_IMAGE:latest"

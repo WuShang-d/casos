@@ -1,0 +1,12 @@
+node_modules/
+build/
+run/
+/thermalscope
+*.log
+__pycache__/
+*.pyc
+.env*
+HARNESS.local.md
+AGENTS.md
+server/assets/runner.tar.gz
+release/

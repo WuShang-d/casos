@@ -1,0 +1,6 @@
+apiVersion: v2
+name: thermalscope
+description: Thermal activity observation and experiment result analysis
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

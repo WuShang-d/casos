@@ -1,0 +1,133 @@
+apiVersion: app.sealos.io/v1
+kind: Template
+metadata:
+  name: thermalscope
+spec:
+  title: 热信号收发实验
+  author: WuShang-d
+  url: https://github.com/casosorg/casos/tree/master/apps/thermalscope
+  gitRepo: https://github.com/casosorg/casos
+  readme: https://raw.githubusercontent.com/casosorg/casos/master/apps/thermalscope/README.md
+  icon: https://raw.githubusercontent.com/casosorg/casos/master/apps/thermalscope/public/icon.svg
+  description: 连接专用实验机，观察程序能否通过 CPU 发热传递 0/1，逐位核对实测接收结果；支持导入已有实验文件。
+  templateType: inline
+  locale: zh
+  categories:
+    - tool
+  defaults:
+    app_name:
+      type: string
+      value: thermalscope-${{ random(6) }}
+  inputs:
+    image:
+      description: 已发布的 ThermalScope 容器镜像完整地址及版本
+      type: string
+      required: true
+    enable_channel:
+      description: 启用专用实验机的主动收发（true 或 false；默认关闭）
+      type: boolean
+      default: "false"
+      required: false
+  i18n:
+    en:
+      title: ThermalScope
+      description: 'CPU thermal-signal transmission experiments on dedicated hosts and offline result analysis.'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ${{ defaults.app_name }}-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+        - name: web
+          image: ${{ inputs.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: THERMALSCOPE_ENABLE_JOBS
+              value: 'true'
+            - name: THERMALSCOPE_ENABLE_CHANNEL
+              value: "${{ inputs.enable_channel }}"
+            - name: THERMALSCOPE_DATA_DIR
+              value: /data/jobs
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ${{ defaults.app_name }}-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+spec:
+  selector:
+    app: ${{ defaults.app_name }}
+  ports:
+    - port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: ${{ defaults.app_name }}.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 80

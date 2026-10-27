@@ -1,0 +1,14 @@
+node_modules
+build
+.git
+run
+*.log
+docs/images
+__pycache__
+*.pyc
+thermalscope
+release
+
+AGENTS.md
+HARNESS.local.md
+.env*
