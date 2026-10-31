@@ -202,7 +202,7 @@ var databaseEngines = map[string]databaseEngine{
 		Key:                  "mongodb",
 		Label:                "MongoDB",
 		Image:                "mongo",
-		Versions:             []string{"7", "6"},
+		Versions:             []string{"8", "7", "6"},
 		Port:                 27017,
 		DataPath:             "/data/db",
 		DefaultUser:          "root",
