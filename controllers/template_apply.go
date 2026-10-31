@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -155,7 +156,7 @@ func (a *templateApplier) apply(ctx context.Context, documents []string) templat
 			// casos does with labels instead.
 			continue
 		case group == "apps.kubeblocks.io" && item.GetKind() == "Cluster":
-			name, err := a.applyDatabase(item)
+			err := a.applyDatabase(ctx, item, &report)
 			if err != nil {
 				report.Unsupported = append(report.Unsupported, unsupportedObject{
 					APIVersion: item.GetAPIVersion(),
@@ -165,7 +166,6 @@ func (a *templateApplier) apply(ctx context.Context, documents []string) templat
 				})
 				continue
 			}
-			report.Databases = append(report.Databases, name)
 		default:
 			if group == "networking.k8s.io" && item.GetKind() == "Ingress" {
 				a.adaptIngress(ctx, item)
@@ -375,18 +375,30 @@ func engineVersionFromRef(engine databaseEngine, ref string) string {
 
 // applyDatabase turns a KubeBlocks Cluster into a casos database, and leaves
 // behind the connection secret under the name KubeBlocks would have used.
-func (a *templateApplier) applyDatabase(item *unstructured.Unstructured) (string, error) {
+func (a *templateApplier) applyDatabase(ctx context.Context, item *unstructured.Unstructured, report *templateApplyReport) error {
 	definition, _, _ := unstructured.NestedString(item.Object, "spec", "clusterDefinitionRef")
+	versionRef, _, _ := unstructured.NestedString(item.Object, "spec", "clusterVersionRef")
+	components, _, _ := unstructured.NestedSlice(item.Object, "spec", "componentSpecs")
+	var component map[string]any
+	if len(components) > 0 {
+		component, _ = components[0].(map[string]any)
+	}
+	componentBased := definition == ""
+	if componentBased {
+		definition, _, _ = unstructured.NestedString(component, "componentDef")
+		if versionRef == "" {
+			versionRef, _, _ = unstructured.NestedString(component, "serviceVersion")
+		}
+	}
 	engineKey, ok := kubeBlocksEngines[definition]
 	if !ok {
-		return "", fmt.Errorf("casos has no engine for a %q database", definition)
+		return fmt.Errorf("casos has no engine for a %q database", definition)
 	}
 	engine, ok := engineByKey(engineKey)
 	if !ok {
-		return "", fmt.Errorf("casos has no engine for a %q database", definition)
+		return fmt.Errorf("casos has no engine for a %q database", definition)
 	}
 
-	versionRef, _, _ := unstructured.NestedString(item.Object, "spec", "clusterVersionRef")
 	request := databaseRequest{
 		Namespace: a.namespace,
 		Name:      item.GetName(),
@@ -395,38 +407,80 @@ func (a *templateApplier) applyDatabase(item *unstructured.Unstructured) (string
 		Database:  sealosDefaultDatabaseName[engine.Key],
 	}
 
-	components, _, _ := unstructured.NestedSlice(item.Object, "spec", "componentSpecs")
-	if len(components) > 0 {
-		if component, ok := components[0].(map[string]any); ok {
-			if cpu, ok, _ := unstructured.NestedString(component, "resources", "limits", "cpu"); ok && cpu != "" {
-				request.CpuLimit = &cpu
+	if component != nil {
+		if cpu, ok, _ := unstructured.NestedString(component, "resources", "limits", "cpu"); ok && cpu != "" {
+			request.CpuLimit = &cpu
+		}
+		if memory, ok, _ := unstructured.NestedString(component, "resources", "limits", "memory"); ok && memory != "" {
+			request.MemoryLimit = &memory
+		}
+		claims, _, _ := unstructured.NestedSlice(component, "volumeClaimTemplates")
+		for _, entry := range claims {
+			claim, ok := entry.(map[string]any)
+			if !ok {
+				continue
 			}
-			if memory, ok, _ := unstructured.NestedString(component, "resources", "limits", "memory"); ok && memory != "" {
-				request.MemoryLimit = &memory
-			}
-			claims, _, _ := unstructured.NestedSlice(component, "volumeClaimTemplates")
-			for _, entry := range claims {
-				claim, ok := entry.(map[string]any)
-				if !ok {
-					continue
-				}
-				if storage, ok, _ := unstructured.NestedString(claim, "spec", "resources", "requests", "storage"); ok && storage != "" {
-					request.Storage = storage
-					break
-				}
+			if storage, ok, _ := unstructured.NestedString(claim, "spec", "resources", "requests", "storage"); ok && storage != "" {
+				request.Storage = storage
+				break
 			}
 		}
 	}
 
 	_, credentials, err := createDatabase(a.cfg, request)
 	if err != nil {
-		return "", err
+		return err
 	}
 
+	report.Databases = append(report.Databases, item.GetName())
 	if err := a.writeConnCredential(item.GetName(), credentials); err != nil {
-		return "", fmt.Errorf("the database was created but its connection secret could not be: %w", err)
+		return fmt.Errorf("the database was created but its connection secret could not be: %w", err)
 	}
-	return item.GetName(), nil
+	report.Applied = append(report.Applied, appliedObject{
+		Version: "v1", Resource: "secrets", Kind: "Secret",
+		Namespace: a.namespace, Name: item.GetName() + "-conn-credential",
+	})
+	if componentBased && engine.Key == "mongodb" {
+		componentName, _, _ := unstructured.NestedString(component, "name")
+		if componentName == "" {
+			return fmt.Errorf("the MongoDB component has no name")
+		}
+		return a.writeMongoDBAliases(ctx, item.GetName(), componentName, credentials, report)
+	}
+	return nil
+}
+
+// Component-based MongoDB templates use KubeBlocks account and service names.
+func (a *templateApplier) writeMongoDBAliases(ctx context.Context, name, component string, credentials databaseCredentials, report *templateApplyReport) error {
+	prefix := name + "-" + component
+	objects := []runtime.Object{
+		&corev1.Secret{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+			ObjectMeta: metav1.ObjectMeta{Name: prefix + "-account-root"},
+			Type:       corev1.SecretTypeOpaque,
+			StringData: map[string]string{"username": credentials.User, "password": credentials.Password},
+		},
+		&corev1.Service{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+			ObjectMeta: metav1.ObjectMeta{Name: prefix},
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{"app": name},
+				Ports:    []corev1.ServicePort{{Name: "db", Port: credentials.Port}},
+			},
+		},
+	}
+	for _, alias := range objects {
+		content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(alias)
+		if err != nil {
+			return err
+		}
+		applied, err := a.applyObject(ctx, &unstructured.Unstructured{Object: content})
+		if err != nil {
+			return err
+		}
+		report.Applied = append(report.Applied, applied)
+	}
+	return nil
 }
 
 // writeConnCredential is the compatibility shim that makes the market work: a
