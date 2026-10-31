@@ -84,6 +84,8 @@ type templateApplier struct {
 	// plainHTTP is set when the app gateway serves the instance's addresses.
 	plainHTTP      bool
 	ingressClasses map[string]bool
+	secrets        map[string]bool
+	secretsUnknown bool
 }
 
 func newTemplateApplier(cfg *rest.Config, namespace, instance, template string) (*templateApplier, error) {
@@ -142,6 +144,7 @@ func (a *templateApplier) apply(ctx context.Context, documents []string) templat
 			continue
 		}
 		quoteEnvValues(content)
+		stripMissingImagePullSecrets(content, a.secretExists)
 		item := &unstructured.Unstructured{Object: content}
 		if item.GetKind() == "" || item.GetAPIVersion() == "" {
 			continue
@@ -185,6 +188,61 @@ func (a *templateApplier) apply(ctx context.Context, documents []string) templat
 	}
 
 	return report
+}
+
+// Sealos templates name a pull secret CasOS never creates.
+func stripMissingImagePullSecrets(node any, exists func(string) bool) {
+	switch value := node.(type) {
+	case map[string]any:
+		if refs, ok := value["imagePullSecrets"].([]any); ok {
+			kept := make([]any, 0, len(refs))
+			for _, ref := range refs {
+				entry, ok := ref.(map[string]any)
+				if !ok {
+					kept = append(kept, ref)
+					continue
+				}
+				name, _ := entry["name"].(string)
+				if name != "" && exists(name) {
+					kept = append(kept, ref)
+				}
+			}
+			if len(kept) == 0 {
+				delete(value, "imagePullSecrets")
+			} else {
+				value["imagePullSecrets"] = kept
+			}
+		}
+		for key, child := range value {
+			if key == "imagePullSecrets" {
+				continue
+			}
+			stripMissingImagePullSecrets(child, exists)
+		}
+	case []any:
+		for _, child := range value {
+			stripMissingImagePullSecrets(child, exists)
+		}
+	}
+}
+
+func (a *templateApplier) secretExists(name string) bool {
+	// Keep the template's secret if the namespace cannot be listed.
+	if a.secretsUnknown {
+		return true
+	}
+	if a.secrets == nil {
+		list, err := object.GetSecrets(a.cfg, a.namespace)
+		if err != nil {
+			a.secretsUnknown = true
+			return true
+		}
+		a.secrets = make(map[string]bool, len(list))
+		for _, secret := range list {
+			a.secrets[secret.Name] = true
+		}
+	}
+	return a.secrets[name]
 }
 
 // quoteEnvValues turns env values such as `value: ${{ inputs.port }}` back into
@@ -320,6 +378,9 @@ func (a *templateApplier) applyObject(ctx context.Context, item *unstructured.Un
 	}
 	if err != nil {
 		return appliedObject{}, err
+	}
+	if created.GetKind() == "Secret" && a.secrets != nil {
+		a.secrets[created.GetName()] = true
 	}
 
 	result := appliedObject{
